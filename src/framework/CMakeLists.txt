@@ -266,7 +266,6 @@ if(NOT WASM)
         ${OPENSSL_LIBRARIES}
         ${ZLIB_LIBRARY}
         ${LIBZIP_LIBRARY}
-	${ZLIB_LIBRARY}
 	${BZIP2_LIBRARIES}
     )
 
