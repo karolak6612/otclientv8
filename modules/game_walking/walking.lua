@@ -36,7 +36,7 @@ function init()
     },
     {
       [CHAT_MODE.ON] = "Numpad8",
-      [CHAT_MODE.OFF] = ""
+      [CHAT_MODE.OFF] = "Numpad8"
     }, true)
   Keybind.new("Movement", "Go " .. DirectionString[East],
     {
@@ -45,7 +45,7 @@ function init()
     },
     {
       [CHAT_MODE.ON] = "Numpad6",
-      [CHAT_MODE.OFF] = ""
+      [CHAT_MODE.OFF] = "Numpad6"
     }, true)
   Keybind.new("Movement", "Go " .. DirectionString[South],
     {
@@ -54,7 +54,7 @@ function init()
     },
     {
       [CHAT_MODE.ON] = "Numpad2",
-      [CHAT_MODE.OFF] = ""
+      [CHAT_MODE.OFF] = "Numpad2"
     }, true)
   Keybind.new("Movement", "Go " .. DirectionString[West],
     {
@@ -63,7 +63,7 @@ function init()
     },
     {
       [CHAT_MODE.ON] = "Numpad4",
-      [CHAT_MODE.OFF] = ""
+      [CHAT_MODE.OFF] = "Numpad4"
     }, true)
 
   Keybind.new("Movement", "Go " .. DirectionString[NorthEast],
@@ -73,7 +73,7 @@ function init()
     },
     {
       [CHAT_MODE.ON] = "",
-      [CHAT_MODE.OFF] = ""
+      [CHAT_MODE.OFF] = "Numpad9"
     }, true)
   Keybind.new("Movement", "Go " .. DirectionString[SouthEast],
     {
@@ -82,7 +82,7 @@ function init()
     },
     {
       [CHAT_MODE.ON] = "",
-      [CHAT_MODE.OFF] = ""
+      [CHAT_MODE.OFF] = "Numpad3"
     }, true)
   Keybind.new("Movement", "Go " .. DirectionString[SouthWest],
     {
@@ -91,7 +91,7 @@ function init()
     },
     {
       [CHAT_MODE.ON] = "",
-      [CHAT_MODE.OFF] = ""
+      [CHAT_MODE.OFF] = "Numpad1"
     }, true)
   Keybind.new("Movement", "Go " .. DirectionString[NorthWest],
     {
@@ -100,7 +100,7 @@ function init()
     },
     {
       [CHAT_MODE.ON] = "",
-      [CHAT_MODE.OFF] = ""
+      [CHAT_MODE.OFF] = "Numpad7"
     }, true)
     
     if g_game.isOnline() then

@@ -326,6 +326,21 @@ function MapExplorer.onLoadMap()
   else
     g_logger.warning("STEP 8: game_walking module not available!")
   end
+
+  -- Bind PageUp/PageDown for Z-axis movement
+  -- Bind to root widget to ensure we catch it even if window loses focus
+  local rootWidget = modules.game_interface.getRootPanel()
+  g_keyboard.bindKeyDown('PageUp', function() 
+    g_logger.info("PageUp pressed")
+    changeFloor(-1) 
+  end, rootWidget)
+  
+  g_keyboard.bindKeyDown('PageDown', function() 
+    g_logger.info("PageDown pressed")
+    changeFloor(1) 
+  end, rootWidget)
+  
+  g_logger.info("STEP 8: Bound PageUp/PageDown for vertical movement to root widget")
   
   --========================================
   -- STEP 9: Bind Camera to Player
@@ -442,6 +457,70 @@ function findSpawnPosition()
   -- Search for nearest valid tile within 200 tile radius
   return findNearestTile(centerX, centerY, centerZ, 200)
 end
+
+function changeFloor(delta)
+  local player = g_game.getLocalPlayer()
+  if not player then return end
+  
+  local pos = player:getPosition()
+  local newZ = pos.z + delta
+  
+  -- Validate Z range (0-15)
+  if newZ < 0 or newZ > 15 then
+    g_logger.warning("Cannot move to floor " .. newZ .. " (out of range)")
+    return
+  end
+  
+  local newPos = {x=pos.x, y=pos.y, z=newZ}
+  
+  -- Check if there is a tile at the new position
+  -- If not, try to find a valid tile nearby on that floor
+  local tile = g_map.getTile(newPos)
+  if not tile then
+    -- Try to find a valid tile nearby
+    local found = false
+    for dx = -1, 1 do
+      for dy = -1, 1 do
+        local checkPos = {x=newPos.x+dx, y=newPos.y+dy, z=newPos.z}
+        if g_map.getTile(checkPos) then
+          newPos = checkPos
+          found = true
+          break
+        end
+      end
+      if found then break end
+    end
+    
+    if not found then
+       g_logger.warning("No tile found at " .. newPos.x .. "," .. newPos.y .. "," .. newPos.z)
+       -- Force create a tile if none exists? No, better to just not move if there's nothing there
+       -- But for map explorer, maybe we WANT to move into the void?
+       -- Let's allow it, but warn
+    end
+  end
+  
+  g_logger.info("Changing floor to " .. newZ)
+  
+  -- Manually handle tile swap (similar to C++ fix)
+  local oldTile = g_map.getTile(pos)
+  if oldTile then
+    oldTile:removeThing(player)
+  end
+  
+  player:setPosition(newPos)
+  
+  local newTile = g_map.getTile(newPos)
+  if newTile then
+    newTile:addThing(player, -1)
+  else
+    -- If no tile exists, we might need to create one or just let the player float?
+    -- g_map.createTile(newPos) -- This might be needed if we want to see the void
+  end
+  
+  -- Update camera
+  g_map.setCentralPosition(newPos)
+end
+
 function MapExplorer.onMapPathChange(widget, text)
   selectedMapPath = text
   local loadButton = mapExplorerWindow:getChildById('loadButton')
