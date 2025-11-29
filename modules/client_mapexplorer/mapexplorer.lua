@@ -677,3 +677,21 @@ function MapExplorer.openOutfitWindow()
     displayErrorBox("Outfit Error", "Failed to open outfit window. Check console for details.")
   end
 end
+
+function MapExplorer.onAutoWalk(toPos)
+  local player = g_game.getLocalPlayer()
+  if not player then return false end
+  
+  -- Simple teleport for now
+  -- TODO: Implement pathfinding if smooth walking is desired
+  g_logger.info(string.format("MapExplorer: Teleporting to (%d, %d, %d)", toPos.x, toPos.y, toPos.z))
+  
+  -- Update position
+  player:setPosition(toPos)
+  g_map.setCentralPosition(toPos)
+  
+  -- Update last player pos to prevent rubberbanding if any
+  lastPlayerPos = toPos
+  
+  return true
+end

@@ -768,6 +768,13 @@ function processMouseAction(menuPosition, mouseButton, autoWalkPos, lookThing, u
       return false
     end
     g_logger.info(string.format("[CLICK WALK DEBUG] About to call autoWalk to (%d,%d,%d)", autoWalkPos.x, autoWalkPos.y, autoWalkPos.z))
+    
+    -- Map Explorer Hook for Auto Walk
+    if MapExplorer and MapExplorer.onAutoWalk then
+      g_logger.info("Delegating autoWalk to MapExplorer")
+      return MapExplorer.onAutoWalk(autoWalkPos)
+    end
+
     local status, err = pcall(function()
       player:autoWalk(autoWalkPos)
     end)
