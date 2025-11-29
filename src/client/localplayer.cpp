@@ -34,6 +34,7 @@ LocalPlayer::LocalPlayer()
     m_vocation = 0;
     m_blessings = Otc::BlessingNone;
     m_walkLockExpiration = 0;
+    m_offlineMode = false; // Default to online mode
 
     m_skillsLevel.resize(Otc::LastSkill + 1, 0);
     m_skillsBaseLevel.resize(Otc::LastSkill + 1, 0);
@@ -179,6 +180,12 @@ void LocalPlayer::cancelNewWalk(Otc::Direction dir)
     if (g_extras.debugWalking) {
         g_logger.info(stdext::format("[%i] cancelWalk", (int)g_clock.millis()));
     }
+    
+    // Offline mode: Don't cancel walks
+    if (m_offlineMode) {
+        g_logger.info("[Offline] Skipping walk cancellation");
+        return;
+    }
 
     bool clearedPrewalk = !m_preWalking.empty();
 
@@ -317,6 +324,11 @@ void LocalPlayer::cancelWalk(Otc::Direction direction)
     if (g_game.getFeature(Otc::GameNewWalking)) {
         return;
     }
+    
+    // Offline mode: Don't cancel walks, they are confirmed locally
+    if (m_offlineMode) {
+        return;
+    }
 
     return cancelNewWalk(direction);
 }
@@ -367,6 +379,15 @@ void LocalPlayer::updateWalk()
         return;
 
     Creature::updateWalk();
+
+    // Offline mode: Commit prewalk immediately without server confirmation
+    if (m_offlineMode && m_walking && isPreWalking() && m_walkTimer.ticksElapsed() >= getStepDuration()) {
+        m_lastPrewalkDone = true;
+        // In offline mode, clear prewalk immediately - no need to wait for server
+        m_preWalking.clear();
+        // Don't call terminateWalk() - just mark as done
+        return;
+    }
 
     // terminate walk only when client and server side walk are completed
     if (m_walking && m_walkTimer.ticksElapsed() >= getStepDuration()) {

@@ -190,7 +190,8 @@ function refresh()
   local player = g_game.getLocalPlayer()
   for i = InventorySlotFirst, InventorySlotPurse do
     if g_game.isOnline() then
-      onInventoryChange(player, i, player:getInventoryItem(i))
+      local item = player and player:getInventoryItem(i) or nil
+      onInventoryChange(player, i, item)
     else
       onInventoryChange(player, i, nil)
     end

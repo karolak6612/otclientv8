@@ -70,6 +70,10 @@ public:
     void setOfflineTrainingTime(double offlineTrainingTime);
     void setSpells(const std::vector<int>& spells);
     void setBlessings(int blessings);
+    
+    // Offline mode support for map explorer
+    void setOfflineMode(bool offline) { m_offlineMode = offline; }
+    bool isOfflineMode() { return m_offlineMode; }
 
     int getStates() { return m_states; }
     int getSkillLevel(uint8_t skill) { return skill < m_skillsLevel.size() ? m_skillsLevel[skill] : 0; }
@@ -166,6 +170,7 @@ private:
     std::list<Position> m_preWalking;
     bool m_serverWalking = false;
     bool m_lastPrewalkDone = false;
+    bool m_offlineMode = false; // Map explorer offline mode
     WalkMatrix m_walkMatrix;
 
     bool m_premium = false;

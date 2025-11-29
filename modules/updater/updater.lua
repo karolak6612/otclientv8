@@ -198,7 +198,7 @@ end
 
 -- public functions
 function Updater.init(loadModulesFunc)
-  g_logger.setOnLog(onLog)
+  -- g_logger.setOnLog(onLog)
   loadModulesFunction = loadModulesFunc
   initAppWindow()
   Updater.check()

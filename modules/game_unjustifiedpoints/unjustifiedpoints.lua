@@ -84,12 +84,11 @@ end
 
 function refresh()
   local localPlayer = g_game.getLocalPlayer()
-
-  local unjustifiedPoints = g_game.getUnjustifiedPoints()
-  onUnjustifiedPointsChange(unjustifiedPoints)
-
-  onSkullChange(localPlayer, localPlayer:getSkull())
-  onOpenPvpSituationsChange(g_game.getOpenPvpSituations())
+  if localPlayer then
+    onSkullChange(localPlayer, localPlayer:getSkull(), 0)
+    onUnjustifiedPointsChange(localPlayer:getUnjustifiedPoints())
+    onOpenPvpSituationsChange(g_game.getOpenPvpSituations())
+  end
 end
 
 function onSkullChange(localPlayer, skull)

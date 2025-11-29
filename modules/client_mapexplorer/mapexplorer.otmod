@@ -1,9 +1,10 @@
 Module
   name: client_mapexplorer
-  description: Offline OTBM Map Explorer
-  author: OTClientV8
+  description: Offline Map Explorer
+  author: edubart
   website: https://github.com/edubart/otclient
-  sandboxed: true
+  priority: 750
   scripts: [ mapexplorer ]
+  dependencies: [ game_things, game_interface ]
   @onLoad: init()
   @onUnload: terminate()

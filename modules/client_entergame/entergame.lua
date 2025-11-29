@@ -296,6 +296,7 @@ end
 
 -- public functions
 function EnterGame.init()
+  print("EnterGame module initializing...")
   if USE_NEW_ENERGAME then return end
   enterGame = g_ui.displayUI('entergame')
   if LOGPASS ~= nil then
@@ -636,20 +637,31 @@ end
 
 
 function EnterGame.onOfflineMapExplorer()
+  g_logger.info("EnterGame: Offline Map Explorer button clicked")
   if g_game.isOnline() then
     local errorBox = displayErrorBox(tr('Offline Map Explorer'), tr('Cannot open map explorer while online.'))
     return
   end
   
-  -- Load map explorer module if not already loaded
-  if not g_modules.getModule('client_mapexplorer') then
-    g_modules.ensureModuleLoaded('client_mapexplorer')
+  -- Load map explorer module
+  g_modules.ensureModuleLoaded('client_mapexplorer')
+  
+  local module = g_modules.getModule('client_mapexplorer')
+  if not module or not module:isLoaded() then
+    g_logger.error("EnterGame: Failed to load client_mapexplorer module")
+    displayErrorBox(tr('Error'), tr('Failed to load map explorer module.'))
+    return
   end
+  
+  g_logger.info("EnterGame: client_mapexplorer module loaded")
   
   -- Show map explorer dialog
   if MapExplorer then
-    MapExplorer.show()
+    g_logger.info("EnterGame: MapExplorer global found, showing window")
+    local version = tonumber(clientVersionSelector:getText())
+    MapExplorer.show(version)
   else
+    g_logger.error("EnterGame: MapExplorer global NOT found after module load!")
     displayErrorBox(tr('Error'), tr('Failed to load map explorer module.'))
   end
 end

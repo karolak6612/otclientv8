@@ -192,7 +192,8 @@ void Game::processGameStart()
     m_online = true;
 
     // synchronize fight modes with the server
-    m_protocolGame->sendChangeFightModes(m_fightMode, m_chaseMode, m_safeFight, m_pvpMode);
+    if(m_protocolGame)
+        m_protocolGame->sendChangeFightModes(m_fightMode, m_chaseMode, m_safeFight, m_pvpMode);
 
     // NOTE: the entire map description and local player information is not known yet (bot call is allowed here)
     enableBotCall();
@@ -680,11 +681,39 @@ void Game::autoWalk(const std::vector<Otc::Direction>& dirs, Position startPos)
 
 void Game::walk(Otc::Direction direction, bool withPreWalk)
 {
+    // CRITICAL: Re-entrancy protection
+    // walk() can be called from multiple sources simultaneously:
+    // 1. KeyDown handler (immediate)
+    // 2. KeyPress handler via smartWalk() (20ms delay)
+    // 3. Bot system
+    // 4. Lua callbacks from onWalk
+    // This creates exponential scheduled events → infinite loop
+    static bool isInWalk = false;
+    if (isInWalk) {
+        g_logger.warning(stdext::format("[Walk] RE-ENTRANCY BLOCKED: dir=%d preWalk=%s", 
+            (int)direction, withPreWalk ? "true" : "false"));
+        m_denyBotCall = true;
+        return;
+    }
+    
+    // RAII guard to reset flag on exit
+    struct WalkGuard {
+        ~WalkGuard() { isInWalk = false; }
+    } guard;
+    isInWalk = true;
+    
     m_denyBotCall = false;
     if (!canPerformGameAction()) {
         m_denyBotCall = true;
         return;
     }
+    
+    g_logger.info(stdext::format("[Walk] ENTRY: GameNewWalking=%s, withPreWalk=%s, protocolGame=%s, direction=%d",
+        g_game.getFeature(Otc::GameNewWalking) ? "true" : "false",
+        withPreWalk ? "true" : "false",
+        m_protocolGame ? "exists" : "null",
+        (int)direction));
+    
     if (g_extras.debugWalking) {
         g_logger.info(stdext::format("[%i] Game::walk", (int)g_clock.millis()));
     }
@@ -692,6 +721,7 @@ void Game::walk(Otc::Direction direction, bool withPreWalk)
     g_lua.callGlobalField("g_game", "onWalk", direction, withPreWalk);
 
     if (g_game.getFeature(Otc::GameNewWalking)) {
+        g_logger.info("[Walk] Using NEW walking system");
         Position pos = m_localPlayer->getPrewalkingPosition();
         uint8_t flags = 0;
         if (withPreWalk) {
@@ -700,10 +730,31 @@ void Game::walk(Otc::Direction direction, bool withPreWalk)
         // Offline mode support: only send if protocol exists
         if (m_protocolGame) {
             m_protocolGame->sendNewWalk(m_walkId, m_walkPrediction, pos, flags, { direction });
+        } else {
+            // Offline mode: Only update central position for camera, don't re-execute walk
+            // The prewalk already moved the player visually
+            if (withPreWalk && m_localPlayer) {
+                Position currentPos = m_localPlayer->getPosition();
+                Position newPos = currentPos.translatedToDirection(direction);
+                
+                g_logger.info(stdext::format("[Offline-New] Walk called: currentPos=(%d,%d,%d) newPos=(%d,%d,%d)", 
+                    currentPos.x, currentPos.y, currentPos.z, newPos.x, newPos.y, newPos.z));
+                
+                // Schedule central position update to keep camera following
+                g_dispatcher.scheduleEvent([this, newPos] {
+                    if (m_localPlayer && m_online) {
+                        g_map.setCentralPosition(newPos);
+                        g_logger.info(stdext::format("[Offline-New] Central position updated: (%d,%d,%d)", 
+                            newPos.x, newPos.y, newPos.z));
+                    }
+                }, m_localPlayer->getStepDuration() / 2);
+            }
         }
         m_denyBotCall = true;
         return;
     }
+    
+    g_logger.info("[Walk] Using OLD walking system");
 
     // Offline mode support: only send protocol messages if connected
     if (m_protocolGame) {
@@ -734,6 +785,20 @@ void Game::walk(Otc::Direction direction, bool withPreWalk)
             break;
         default:
             break;
+        }
+    } else {
+        // Offline mode: Only update central position for camera
+        // DON'T re-execute walk() - the prewalk already moved the player
+        if (withPreWalk && m_localPlayer) {
+            Position oldPos = m_localPlayer->getPosition();
+            Position newPos = oldPos.translatedToDirection(direction);
+            g_dispatcher.scheduleEvent([this, newPos] {
+                if (m_localPlayer && m_online) {
+                    g_map.setCentralPosition(newPos);
+                    g_logger.info(stdext::format("[Offline-Old] Central position updated: (%d,%d,%d)",
+                        newPos.x, newPos.y, newPos.z));
+                }
+            }, m_localPlayer->getStepDuration() / 2);
         }
     }
     m_denyBotCall = true;
@@ -1592,10 +1657,16 @@ bool Game::canPerformGameAction()
     // - the game is online
     // - the local player exists
     // - the local player is not dead
-    // - we have a game protocol
-    // - the game protocol is connected
+    // - we have a game protocol (OR we're in offline/local mode)
+    // - the game protocol is connected (OR we're in offline/local mode)
     // - its not a bot action
-    return m_online && m_localPlayer && !m_localPlayer->isDead() && !m_dead && m_protocolGame && m_protocolGame->isConnected() && checkBotProtection();
+    
+    // Offline/Local mode: Allow actions if online but no protocol (Map Explorer)
+    bool hasValidProtocol = (m_protocolGame && m_protocolGame->isConnected());
+    bool isOfflineMode = (m_online && !m_protocolGame); // Online but no protocol = offline mode
+    
+    return m_online && m_localPlayer && !m_localPlayer->isDead() && !m_dead && 
+           (hasValidProtocol || isOfflineMode) && checkBotProtection();
 }
 
 void Game::setProtocolVersion(int version)

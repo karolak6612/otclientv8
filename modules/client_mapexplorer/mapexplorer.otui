@@ -5,25 +5,9 @@ MapExplorerWindow < MainWindow
   @onEscape: self:destroy()
 
   Label
-    !text: tr('Client Version:')
-    anchors.left: parent.left
-    anchors.top: parent.top
-    margin-top: 10
-    margin-left: 10
-
-  ComboBox
-    id: versionSelector
-    anchors.left: prev.right
-    anchors.top: prev.top
-    anchors.right: parent.right
-    margin-left: 10
-    margin-right: 10
-    margin-top: -3
-
-  Label
     !text: tr('Map File:')
     anchors.left: parent.left
-    anchors.top: prev.bottom
+    anchors.top: parent.top
     margin-top: 15
     margin-left: 10
 
@@ -35,13 +19,15 @@ MapExplorerWindow < MainWindow
     margin-left: 10
     margin-right: 5
     margin-top: -3
-    enabled: false
+    enabled: true
+    @onTextChange: MapExplorer.onMapPathChange(self, self:getText())
 
   Button
     id: browseButton
-    !text: tr('Browse...')
+    !text: tr('Type Path')
     anchors.right: parent.right
-    anchors.top: mapPathEdit.top
+    anchors.top: parent.top
+    margin-top: 12
     margin-right: 10
     width: 80
     @onClick: MapExplorer.onBrowseMap()
@@ -73,15 +59,17 @@ MapExplorerWindow < MainWindow
     anchors.bottom: parent.bottom
     margin-right: 10
     margin-bottom: 10
-    width: 100
+    width: 90
     enabled: false
     @onClick: MapExplorer.onLoadMap()
 
   Button
     id: cancelButton
     !text: tr('Cancel')
-    anchors.right: prev.left
-    anchors.bottom: prev.bottom
+    anchors.right: loadButton.left
+    anchors.bottom: parent.bottom
     margin-right: 10
-    width: 100
-    @onClick: self:getParent():destroy()
+    width: 90
+    @onClick: MapExplorer.hide()
+
+MapExplorerWindow

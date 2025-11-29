@@ -569,6 +569,21 @@ void Map::setCentralPosition(const Position& centralPosition)
 
     removeUnawareThings();
 
+    // Skip force-correction in offline mode - no server desync possible
+    LocalPlayerPtr localPlayer = g_game.getLocalPlayer();
+    if (localPlayer && localPlayer->isOfflineMode()) {
+        // In offline mode, trust the player position - no packet loss recovery needed
+        g_logger.info(stdext::format("[Offline] setCentralPosition: (%d,%d,%d) - SKIPPING force-correction", 
+            centralPosition.x, centralPosition.y, centralPosition.z));
+        for(const MapViewPtr& mapView : m_mapViews)
+            mapView->onMapCenterChange(centralPosition);
+        return;  // Early exit, skip the async force-teleport event
+    }
+
+    g_logger.info(stdext::format("[Online] setCentralPosition: (%d,%d,%d) - scheduling force-correction check", 
+        centralPosition.x, centralPosition.y, centralPosition.z));
+
+    // Online mode: Keep force-correction logic for packet loss recovery
     // this fixes local player position when the local player is removed from the map,
     // the local player is removed from the map when there are too many creatures on his tile,
     // so there is no enough stackpos to the server send him
@@ -587,7 +602,8 @@ void Map::setCentralPosition(const Position& centralPosition)
                 localPlayer->onDisappear();
             localPlayer->setPosition(pos);
             localPlayer->onAppear();
-            g_logger.debug("forced player position update");
+            g_logger.info(stdext::format("[Online] FORCED player position: (%d,%d,%d) -> (%d,%d,%d)", 
+                oldPos.x, oldPos.y, oldPos.z, pos.x, pos.y, pos.z));
         }
     });
 

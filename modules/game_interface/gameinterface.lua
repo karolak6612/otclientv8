@@ -1219,6 +1219,6 @@ function getLeftAction()
   return ""
 end
 
-function isChatVisible()
-  return gameBottomPanel:getHeight() >= 5
+function getMapPanel()
+  return gameMapPanel
 end

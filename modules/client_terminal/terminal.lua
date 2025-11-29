@@ -184,6 +184,8 @@ function init()
       addLine(line.text, line.color)
     end
   end
+  
+  addLine("Terminal Initialized - Debug Test", "#00ff00")
 end
 
 function terminate()

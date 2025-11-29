@@ -66,6 +66,10 @@ public:
     void init();
     void terminate();
 
+    void processGameStart();
+    void setOnline(bool online) { m_online = online; }
+    void setLocalPlayer(const LocalPlayerPtr& player) { m_localPlayer = player; }
+
 private:
     void resetGameStates();
 
@@ -85,7 +89,6 @@ protected:
     void processPendingGame();
     void processEnterGame();
 
-    void processGameStart();
     void processGameEnd();
     void processDeath(int deathType, int penality);
 
