@@ -126,6 +126,10 @@ private:
 
 struct AwareRange
 {
+    friend class Game;
+    friend class Minimap;
+    friend class MapView;
+    friend class ProtocolGame;
     int top;
     int right;
     int bottom;
@@ -157,6 +161,10 @@ struct Node {
 //@bindsingleton g_map
 class Map
 {
+    friend class Game;
+    friend class Minimap;
+    friend class MapView;
+    friend class ProtocolGame;
 public:
     void init();
     void terminate();
@@ -215,6 +223,9 @@ public:
     const TileList getTiles(int floor = -1);
     void cleanTile(const Position& pos);
 
+    // bounds checking
+    bool isPositionWithinMapBounds(const Position& pos);
+
     // tile zone related
     void setShowZone(tileflags_t zone, bool show);
     void setShowZones(bool show);
@@ -270,6 +281,9 @@ public:
     std::tuple<std::vector<Otc::Direction>, Otc::PathFindResult> findPath(const Position& start, const Position& goal, int maxComplexity, int flags = 0);
     PathFindResult_ptr newFindPath(const Position& start, const Position& goal, std::shared_ptr<std::list<Node*>> visibleNodes);
     void findPathAsync(const Position & start, const Position & goal, std::function<void(PathFindResult_ptr)> callback);
+    
+    // Offline mode safe pathfinding wrapper
+    std::tuple<std::vector<Otc::Direction>, Otc::PathFindResult> findPathSafe(const Position& start, const Position& goal, int maxComplexity = 0, int flags = 0);
 
     // tuple = <cost, distance, prevPos>
     std::map<std::string, std::tuple<int, int, int, std::string>> findEveryPath(const Position& start, int maxDistance, const std::map<std::string, std::string>& params);
@@ -282,7 +296,7 @@ public:
 
 private:
     void removeUnawareThings();
-    uint getBlockIndex(const Position& pos) { return ((pos.y / BLOCK_SIZE) * (65536 / BLOCK_SIZE)) + (pos.x / BLOCK_SIZE); }
+    uint getBlockIndex(const Position& pos) const { return ((pos.y / BLOCK_SIZE) * (65536 / BLOCK_SIZE)) + (pos.x / BLOCK_SIZE); }
 
     std::map<uint, TileBlock> m_tileBlocks[Otc::MAX_Z+1];
     std::map<uint32, CreaturePtr> m_knownCreatures;

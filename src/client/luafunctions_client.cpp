@@ -152,6 +152,7 @@ void Client::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_map", "setWidth", &Map::setWidth, &g_map);
     g_lua.bindSingletonFunction("g_map", "setHeight", &Map::setHeight, &g_map);
     g_lua.bindSingletonFunction("g_map", "getSize", &Map::getSize, &g_map);
+    g_lua.bindSingletonFunction("g_map", "isPositionWithinMapBounds", [](const Position& pos) { return g_map.isPositionWithinMapBounds(pos); });
     g_lua.bindSingletonFunction("g_map", "setDescription", &Map::setDescription, &g_map);
     g_lua.bindSingletonFunction("g_map", "getDescriptions", &Map::getDescriptions, &g_map);
     g_lua.bindSingletonFunction("g_map", "clearDescriptions", &Map::clearDescriptions, &g_map);
@@ -806,6 +807,9 @@ void Client::registerLuaFunctions()
     // Offline mode support for map explorer
     g_lua.bindClassMemberFunction<LocalPlayer>("setOfflineMode", &LocalPlayer::setOfflineMode);
     g_lua.bindClassMemberFunction<LocalPlayer>("isOfflineMode", &LocalPlayer::isOfflineMode);
+    g_lua.bindClassMemberFunction<LocalPlayer>("setNoClipMode", &LocalPlayer::setNoClipMode);
+    g_lua.bindClassMemberFunction<LocalPlayer>("isNoClipEnabled", &LocalPlayer::isNoClipEnabled);
+    g_lua.bindClassMemberFunction<LocalPlayer>("setPositionInstant", &LocalPlayer::setPositionInstant);
 
     g_lua.registerClass<Tile>();
     g_lua.bindClassMemberFunction<Tile>("clean", &Tile::clean);
@@ -986,6 +990,8 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<UIMinimap>("anchorPosition", &UIMinimap::anchorPosition);
     g_lua.bindClassMemberFunction<UIMinimap>("fillPosition", &UIMinimap::fillPosition);
     g_lua.bindClassMemberFunction<UIMinimap>("centerInPosition", &UIMinimap::centerInPosition);
+
+    g_lua.bindSingletonFunction("g_minimap", "generateFromMap", &Minimap::generateFromMap, &g_minimap);
 
     g_lua.registerClass<UIProgressRect, UIWidget>();
     g_lua.bindClassStaticFunction<UIProgressRect>("create", [] { return std::make_shared<UIProgressRect>(); });

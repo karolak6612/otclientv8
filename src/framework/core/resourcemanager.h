@@ -62,6 +62,7 @@ public:
 
     bool makeDir(const std::string directory);
     std::list<std::string> listDirectoryFiles(const std::string & directoryPath = "", bool fullPath = false, bool raw = false);
+    std::string getFileModificationTime(const std::string& fileName);
 
     std::string resolvePath(std::string path);
     std::string getWorkDir() { return "/"; }

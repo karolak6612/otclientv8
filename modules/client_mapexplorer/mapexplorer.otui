@@ -1,64 +1,62 @@
+FileBrowserItem < Label
+  height: 20
+  margin-left: 2
+  text-align: left
+  font: verdana-11px-monochrome
+  background-color: alpha
+  text-offset: 20 0
+  icon-rect: 0 0 16 16
+  icon-offset: 2 2
+  focusable: true
+  
+  $focus:
+    background-color: #ffffff22
+    color: #ffffff
+
 MapExplorerWindow < MainWindow
   id: mapExplorerWindow
   !text: tr('Offline Map Explorer')
-  size: 400 250
+  size: 500 400
   @onEscape: self:destroy()
 
   Label
-    !text: tr('Map File:')
+    !text: tr('Current Path:')
     anchors.left: parent.left
     anchors.top: parent.top
-    margin-top: 15
-    margin-left: 10
+    margin-top: 5
 
   TextEdit
-    id: mapPathEdit
+    id: pathEdit
     anchors.left: prev.right
-    anchors.top: prev.top
-    anchors.right: browseButton.left
-    margin-left: 10
-    margin-right: 5
-    margin-top: -3
-    enabled: true
-    @onTextChange: MapExplorer.onMapPathChange(self, self:getText())
-
-  Button
-    id: browseButton
-    !text: tr('Type Path')
-    anchors.right: parent.right
     anchors.top: parent.top
-    margin-top: 12
-    margin-right: 10
-    width: 80
-    @onClick: MapExplorer.onBrowseMap()
-
-  Label
-    id: statusLabel
-    !text: tr('Select a .otbm file and click Load')
-    anchors.left: parent.left
     anchors.right: parent.right
-    anchors.top: prev.bottom
-    margin-top: 20
-    margin-left: 10
-    margin-right: 10
-    text-align: center
-    color: #aaaaaa
+    margin-left: 5
+    enabled: false
 
-  HorizontalSeparator
+  TextList
+    id: fileList
+    anchors.top: prev.bottom
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.bottom: loadButton.top
+    margin-top: 10
     margin-bottom: 10
-    margin-left: 10
-    margin-right: 10
+    vertical-scrollbar: fileListScrollBar
+    focusable: false
+
+  VerticalScrollBar
+    id: fileListScrollBar
+    anchors.top: fileList.top
+    anchors.bottom: fileList.bottom
+    anchors.right: fileList.right
+    step: 14
+    pixels-scroll: true
 
   Button
     id: loadButton
     !text: tr('Load Map')
     anchors.right: parent.right
     anchors.bottom: parent.bottom
-    margin-right: 10
-    margin-bottom: 10
     width: 90
     enabled: false
     @onClick: MapExplorer.onLoadMap()
@@ -66,10 +64,124 @@ MapExplorerWindow < MainWindow
   Button
     id: cancelButton
     !text: tr('Cancel')
-    anchors.right: loadButton.left
+    anchors.right: prev.left
     anchors.bottom: parent.bottom
     margin-right: 10
     width: 90
     @onClick: MapExplorer.hide()
+
+ExplorerPanel < MainWindow
+  id: explorerPanel
+  !text: tr('Explorer Tools')
+  size: 250 300
+  visible: false
+  
+  Label
+    !text: tr('Teleport')
+    anchors.top: parent.top
+    anchors.left: parent.left
+    font: verdana-11px-rounded
+    
+  TextEdit
+    id: posX
+    anchors.top: prev.bottom
+    anchors.left: parent.left
+    width: 60
+    margin-top: 5
+    focusable: true
+    
+  TextEdit
+    id: posY
+    anchors.top: prev.top
+    anchors.left: prev.right
+    width: 60
+    margin-left: 5
+    focusable: true
+    
+  TextEdit
+    id: posZ
+    anchors.top: prev.top
+    anchors.left: prev.right
+    width: 30
+    margin-left: 5
+    focusable: true
+    
+  Button
+    !text: tr('Go')
+    anchors.top: prev.top
+    anchors.left: prev.right
+    anchors.right: parent.right
+    margin-left: 5
+    @onClick: MapExplorer.onTeleport()
+    
+  HorizontalSeparator
+    anchors.top: prev.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 10
+    
+  CheckBox
+    id: noClipCheck
+    anchors.top: prev.bottom
+    anchors.left: parent.left
+    margin-top: 10
+    width: 20
+    @onCheckChange: MapExplorer.toggleNoClip(self:isChecked())
+
+  Label
+    !text: tr('No-Clip / God Mode')
+    anchors.left: prev.right
+    anchors.verticalCenter: prev.verticalCenter
+    margin-left: 5
+    width: 150
+    
+  HorizontalSeparator
+    anchors.top: prev.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 10
+    
+  Label
+    !text: tr('Ambient Light')
+    anchors.top: prev.bottom
+    anchors.left: parent.left
+    margin-top: 10
+    
+  HorizontalScrollBar
+    id: lightScroll
+    anchors.top: prev.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 5
+    minimum: 0
+    maximum: 255
+    step: 1
+    value: 255
+    @onValueChange: MapExplorer.onLightChange(self:getValue())
+
+  Label
+    !text: tr('Speed')
+    anchors.top: prev.bottom
+    anchors.left: parent.left
+    margin-top: 10
+    
+  HorizontalScrollBar
+    id: speedScroll
+    anchors.top: prev.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 5
+    minimum: 100
+    maximum: 2000
+    step: 50
+    value: 200
+    @onValueChange: MapExplorer.onSpeedChange(self:getValue())
+    
+  Button
+    !text: tr('Change Outfit')
+    anchors.bottom: parent.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    @onClick: MapExplorer.openOutfitWindow()
 
 MapExplorerWindow

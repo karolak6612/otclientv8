@@ -545,6 +545,15 @@ std::list<std::string> ResourceManager::listDirectoryFiles(const std::string& di
     return files;
 }
 
+std::string ResourceManager::getFileModificationTime(const std::string& fileName)
+{
+    std::string fullPath = resolvePath(fileName);
+    PHYSFS_sint64 modtime = PHYSFS_getLastModTime(fullPath.c_str());
+    if (modtime == -1)
+        return "0";
+    return std::to_string(modtime);
+}
+
 std::string ResourceManager::resolvePath(std::string path)
 {
     if(!stdext::starts_with(path, "/")) {

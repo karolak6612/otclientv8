@@ -735,6 +735,10 @@ ThingPtr Tile::getTopMultiUseThingEx(Point offset)
 
 bool Tile::isWalkable(bool ignoreCreatures)
 {
+    if (g_game.getLocalPlayer() && g_game.getLocalPlayer()->isNoClipEnabled()) {
+        return true;
+    }
+
     if(!getGround())
         return false;
 

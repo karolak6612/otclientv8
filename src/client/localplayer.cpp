@@ -35,6 +35,7 @@ LocalPlayer::LocalPlayer()
     m_blessings = Otc::BlessingNone;
     m_walkLockExpiration = 0;
     m_offlineMode = false; // Default to online mode
+    m_noClipMode = false;
 
     m_skillsLevel.resize(Otc::LastSkill + 1, 0);
     m_skillsBaseLevel.resize(Otc::LastSkill + 1, 0);
@@ -72,6 +73,8 @@ void LocalPlayer::lockWalk(int millis)
 
 bool LocalPlayer::canWalk(Otc::Direction direction, bool ignoreLock)
 {
+    if (m_noClipMode) return true;
+
     // cannot walk while locked
     if ((m_walkLockExpiration != 0 && g_clock.millis() < m_walkLockExpiration) && !ignoreLock)
         return false;
@@ -79,8 +82,6 @@ bool LocalPlayer::canWalk(Otc::Direction direction, bool ignoreLock)
     // paralyzed
     if (m_speed == 0)
         return false;
-
-    // last walk is not done yet
     if (m_walking && (m_walkTimer.ticksElapsed() < getStepDuration()) && !isAutoWalking() && !isServerWalking())
         return false;
 
@@ -382,26 +383,54 @@ void LocalPlayer::updateWalk()
 
     // Offline mode: Commit prewalk immediately without server confirmation
     if (m_offlineMode && m_walking && isPreWalking() && m_walkTimer.ticksElapsed() >= getStepDuration()) {
+        g_logger.info(stdext::format("[CRASH DEBUG] Offline walk update starting, m_preWalking.size=%d", (int)m_preWalking.size()));
+        
         // Fix: Update logical position to match the visual movement
         if (!m_preWalking.empty()) {
             Position newPos = m_preWalking.front();
-            TilePtr oldTile = getTile();
-            TilePtr newTile = g_map.getTile(newPos);
+            g_logger.info(stdext::format("[CRASH DEBUG] New position: (%d,%d,%d)", newPos.x, newPos.y, newPos.z));
             
-            if (oldTile) {
-                oldTile->removeThing(asLocalPlayer());
+            // CRITICAL: Add NULL checks before tile operations
+            TilePtr oldTile = getTile();
+            g_logger.info(stdext::format("[CRASH DEBUG] Old tile: %s", oldTile ? "EXISTS" : "NULL"));
+            
+            TilePtr newTile = g_map.getTile(newPos);
+            g_logger.info(stdext::format("[CRASH DEBUG] New tile: %s", newTile ? "EXISTS" : "NULL"));
+            
+            // Extra safety: Check if m_noClipMode allows walking to NULL tiles
+            if (!newTile && !m_noClipMode) {
+                g_logger.error(stdext::format("[CRASH DEBUG] Cannot walk to NULL tile at (%d,%d,%d) - stopping walk",
+                    newPos.x, newPos.y, newPos.z));
+                m_preWalking.clear();
+                stopWalk();
+                return;
             }
             
+            if (oldTile) {
+                g_logger.info("[CRASH DEBUG] About to call oldTile->removeThing");
+                oldTile->removeThing(asLocalPlayer());
+                g_logger.info("[CRASH DEBUG] oldTile->removeThing completed");
+            } else {
+                g_logger.warning("[CRASH DEBUG] Old tile is NULL, skipping removeThing");
+            }
+            
+            g_logger.info("[CRASH DEBUG] About to call setPosition");
             setPosition(newPos);
+            g_logger.info("[CRASH DEBUG] setPosition completed");
             
             if (newTile) {
+                g_logger.info("[CRASH DEBUG] About to call newTile->addThing");
                 newTile->addThing(asLocalPlayer(), -1);
+                g_logger.info("[CRASH DEBUG] newTile->addThing completed");
+            } else if (m_noClipMode) {
+                g_logger.info("[CRASH DEBUG] New tile is NULL but NoClip enabled, position updated without tile");
             }
         }
 
         m_lastPrewalkDone = true;
         // In offline mode, clear prewalk immediately - no need to wait for server
         m_preWalking.clear();
+        g_logger.info("[CRASH DEBUG] Offline walk update completed successfully");
         // Don't call terminateWalk() - just mark as done
         return;
     }
@@ -722,4 +751,42 @@ void LocalPlayer::setBlessings(int blessings)
 bool LocalPlayer::hasSight(const Position& pos)
 {
     return m_position.isInRange(pos, g_map.getAwareRange().left - 1, g_map.getAwareRange().top - 1);
+}
+void LocalPlayer::setPositionInstant(const Position& pos, bool updateCamera)
+{
+    // Validate position first
+    if(!g_map.isPositionWithinMapBounds(pos)) {
+        g_logger.debug("setPositionInstant: Position out of bounds " + std::to_string(pos.x) + "," + std::to_string(pos.y) + "," + std::to_string(pos.z));
+        return;  // Don't set invalid position
+    }
+    
+    Position oldPos = m_position;
+    
+    // Remove from old tile if exists
+    const TilePtr& oldTile = g_map.getTile(oldPos);
+    if(oldTile) {
+        oldTile->removeThing(static_self_cast<Creature>());
+    }
+    
+    // Update position (call parent)
+    Creature::setPosition(pos);
+    
+    // Add to new tile if exists
+    const TilePtr& newTile = g_map.getTile(pos);
+    if(newTile) {
+        newTile->addThing(static_self_cast<Creature>(), -1);
+    }
+    
+    // Clear walk state for clean movement
+    m_walking = false;
+    m_preWalking.clear();
+    m_walkTimer.restart();
+    
+    // Update camera if requested
+    if(updateCamera && g_map.getCentralPosition() != pos) {
+        g_map.setCentralPosition(pos);
+    }
+    
+    // Log position change (can't call Lua event automatically due to Position type)
+    g_logger.debug("Instant position change completed");
 }

@@ -43,6 +43,12 @@ public:
     void stopAutoWalk();
     bool autoWalk(Position destination, bool retry = false);
     bool canWalk(Otc::Direction direction, bool ignoreLock = false);
+    void setNoClipMode(bool enable) { m_noClipMode = enable; }
+    bool isNoClipEnabled() { return m_noClipMode; }
+    
+    // Offline mode instant position change
+    void setPositionInstant(const Position& pos, bool updateCamera = true);
+    
     bool isWalkLocked() {
         return (m_walkLockExpiration != 0 && g_clock.millis() < m_walkLockExpiration);
     }
@@ -172,6 +178,7 @@ private:
     bool m_serverWalking = false;
     bool m_lastPrewalkDone = false;
     bool m_offlineMode = false; // Map explorer offline mode
+    bool m_noClipMode = false;
     WalkMatrix m_walkMatrix;
 
     bool m_premium = false;

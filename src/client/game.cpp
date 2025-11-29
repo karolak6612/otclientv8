@@ -638,6 +638,18 @@ void Game::autoWalk(const std::vector<Otc::Direction>& dirs, Position startPos)
     if(!canPerformGameAction())
         return;
 
+    // ADD OFFLINE MODE CHECK
+    if(!isOnline()) {
+        g_logger.debug("Offline mode: Skipping server autoWalk packet");
+        // Directly execute the walk locally
+        if(m_localPlayer) {
+            m_localPlayer->stopAutoWalk();
+            // Skip the server packet send - don't need to set destination in offline mode
+            return;
+        }
+        return;
+    }
+
     if (dirs.size() == 0)
         return;
 

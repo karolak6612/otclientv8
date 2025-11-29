@@ -175,6 +175,7 @@ local PreviewOptions = {
 }
 
 function create(currentOutfit, outfitList, mountList, wingList, auraList, shaderList, healthBarList, manaBarList)
+  g_logger.info("outfit.lua: create called")
   if ignoreNextOutfitWindow and g_clock.millis() < ignoreNextOutfitWindow + 1000 then
     return
   end
@@ -1089,6 +1090,7 @@ function onColorCheckChange(widget, selectedWidget)
 end
 
 function updatePreview()
+  g_logger.info("outfit.lua: updatePreview called")
   local direction = previewCreature:getDirection()
   local previewOutfit = table.copy(tempOutfit)
 
@@ -1183,7 +1185,9 @@ function updatePreview()
     window.preview.panel.bars:show()
   end
 
+  g_logger.info("outfit.lua: About to call previewCreature:setOutfit")
   previewCreature:setOutfit(previewOutfit)
+  g_logger.info("outfit.lua: previewCreature:setOutfit completed")
   previewCreature:setDirection(direction)
 end
 
@@ -1305,6 +1309,7 @@ function loadDefaultSettings()
 end
 
 function accept()
+  g_logger.info("outfit.lua: accept() called")
   if g_game.getFeature(GamePlayerMounts) then
     local player = g_game.getLocalPlayer()
     local isMountedChecked = window.configure.mount.check:isChecked()
@@ -1318,6 +1323,39 @@ function accept()
     end
   end
 
-  g_game.changeOutfit(tempOutfit)
+  if g_game.isOnline() then
+    g_logger.info("outfit.lua: Online mode, calling g_game.changeOutfit")
+    g_game.changeOutfit(tempOutfit)
+  else
+    g_logger.info("outfit.lua: Offline mode")
+    local player = g_game.getLocalPlayer()
+    if player then
+      -- Ensure outfit has all required fields to prevent C++ crashes
+      local safeOutfit = table.copy(tempOutfit)
+      safeOutfit.type = safeOutfit.type or 0
+      safeOutfit.head = safeOutfit.head or 0
+      safeOutfit.body = safeOutfit.body or 0
+      safeOutfit.legs = safeOutfit.legs or 0
+      safeOutfit.feet = safeOutfit.feet or 0
+      safeOutfit.addons = safeOutfit.addons or 0
+      safeOutfit.mount = safeOutfit.mount or 0
+      
+      g_logger.info(string.format("Offline: Setting outfit type=%d", safeOutfit.type))
+      local status, err = pcall(function() 
+        g_logger.info("outfit.lua: Calling player:setOutfit inside pcall")
+        player:setOutfit(safeOutfit) 
+        g_logger.info("outfit.lua: player:setOutfit returned")
+      end)
+      if not status then
+        g_logger.error("Failed to set outfit offline: " .. err)
+      else
+        g_logger.info("outfit.lua: setOutfit successful")
+      end
+    else
+      g_logger.error("outfit.lua: No local player found!")
+    end
+  end
+  g_logger.info("outfit.lua: Destroying window")
   destroy()
+  g_logger.info("outfit.lua: Window destroyed")
 end

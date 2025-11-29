@@ -29,6 +29,7 @@ set(client_SOURCES ${client_SOURCES}
     ${CMAKE_CURRENT_LIST_DIR}/map.cpp
     ${CMAKE_CURRENT_LIST_DIR}/map.h
     ${CMAKE_CURRENT_LIST_DIR}/mapio.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/map_safe_path.cpp
     ${CMAKE_CURRENT_LIST_DIR}/mapview.cpp
     ${CMAKE_CURRENT_LIST_DIR}/mapview.h
     ${CMAKE_CURRENT_LIST_DIR}/minimap.cpp

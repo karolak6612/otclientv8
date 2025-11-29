@@ -695,8 +695,13 @@ void Creature::setOutfit(const Outfit& outfit)
         m_outfit.setWings(0);
         m_outfit.setAura(0);
     } else {
-        if (outfit.getId() > 0 && !g_things.isValidDatId(outfit.getId(), ThingCategoryCreature))
-            return;
+        // ADD VALIDATION with logging for offline mode debugging
+        if (outfit.getId() > 0) {
+            if (!g_things.isValidDatId(outfit.getId(), ThingCategoryCreature)) {
+                g_logger.debug(stdext::format("Invalid outfit type: %d", outfit.getId()));
+                return;  // Don't set invalid outfit
+            }
+        }
         m_outfit = outfit;
     }
     m_walkAnimationPhase = 0; // might happen when player is walking and outfit is changed.

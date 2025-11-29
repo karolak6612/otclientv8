@@ -1,8 +1,14 @@
 MapExplorer = {}
 
 local mapExplorerWindow
+local explorerPanel
 local selectedMapPath = ""
 local selectedVersion = 1098
+local reloadEvent = nil
+local lastModTime = "0"
+local updatePanelEvent = nil
+local autoSaveEvent = nil
+local lastPlayerPos = nil
 
 function init()
   g_logger.info("MapExplorer: init() called")
@@ -10,20 +16,107 @@ function init()
   
   -- Load last used settings
   selectedMapPath = g_settings.getString('mapexplorer/lastMapPath', '')
-  g_logger.info("MapExplorer: module initialized. Last path: " .. selectedMapPath)
-  return true
+  
+  -- Initialize FileBrowser
+  FileBrowser.init()
+  
+  -- Connect to game start to show explorer panel
+  connect(g_game, { onGameStart = MapExplorer.onGameStart,
+                    onGameEnd = MapExplorer.onGameEnd })
+  
+  -- Bind floor change keys
+  g_keyboard.bindKeyPress('PageUp', MapExplorer.floorUp)
+  g_keyboard.bindKeyPress('PageDown', MapExplorer.floorDown)
+
+  -- Hook g_game.changeOutfit for offline mode
+  if not g_game.originalChangeOutfit then
+    g_game.originalChangeOutfit = g_game.changeOutfit
+    g_game.changeOutfit = function(outfit)
+      -- Always use offline logic in MapExplorer mode, even if engine thinks it's online
+      g_logger.info("MapExplorer: changeOutfit hook called")
+      local player = g_game.getLocalPlayer()
+      if player then
+        -- Ensure outfit has all required fields to prevent C++ crashes
+        outfit.type = outfit.type or 0
+        outfit.head = outfit.head or 0
+        outfit.body = outfit.body or 0
+        outfit.legs = outfit.legs or 0
+        outfit.feet = outfit.feet or 0
+        outfit.addons = outfit.addons or 0
+        outfit.mount = outfit.mount or 0
+        outfit.wings = outfit.wings or 0
+        outfit.aura = outfit.aura or 0
+        outfit.shader = outfit.shader or "outfit_default"
+        outfit.healthBar = outfit.healthBar or 0
+        outfit.manaBar = outfit.manaBar or 0
+        
+        g_logger.info(string.format("Setting outfit: type=%d head=%d body=%d legs=%d feet=%d addons=%d mount=%d", 
+            outfit.type, outfit.head, outfit.body, outfit.legs, outfit.feet, outfit.addons, outfit.mount))
+            
+        -- Crash protection: Check if outfit type is valid
+        if outfit.type >= 1 and outfit.type <= 1000 then
+          local status, err = pcall(function() 
+            g_logger.info("[CRASH DEBUG] About to call player:setOutfit")
+            player:setOutfit(outfit)
+            g_logger.info("[CRASH DEBUG] player:setOutfit completed successfully")
+          end)
+          if not status then
+            g_logger.error("[CRASH DEBUG] Failed to set outfit: " .. tostring(err))
+            displayInfoBox("Outfit Error", "Failed to change outfit: " .. tostring(err))
+          else
+            g_logger.info("Outfit set successfully")
+          end
+        else
+          g_logger.error("Invalid outfit type: " .. tostring(outfit.type))
+          displayInfoBox("Outfit Error", "Invalid outfit type: " .. tostring(outfit.type))
+        end
+      end
+    end
+  end
+  
 end
 
 function terminate()
   g_logger.info("MapExplorer: terminate() called")
+  disconnect(g_game, { onGameStart = MapExplorer.onGameStart,
+                       onGameEnd = MapExplorer.onGameEnd })
+                       
+  if reloadEvent then
+    removeEvent(reloadEvent)
+    reloadEvent = nil
+  end
+  
+  if updatePanelEvent then
+    removeEvent(updatePanelEvent)
+    updatePanelEvent = nil
+  end
+
+  if autoSaveEvent then
+    removeEvent(autoSaveEvent)
+    autoSaveEvent = nil
+  end
+  
   if mapExplorerWindow then
     mapExplorerWindow:destroy()
+    mapExplorerWindow = nil
   end
+  
+  if explorerPanel then
+    explorerPanel:destroy()
+    explorerPanel = nil
+  end
+  
+  -- Restore original changeOutfit if needed
+  if g_game.originalChangeOutfit then
+    g_game.changeOutfit = g_game.originalChangeOutfit
+    g_game.originalChangeOutfit = nil
+  end
+  
+  FileBrowser.terminate()
   return true
 end
 
 function MapExplorer.show(version)
-  g_logger.info("MapExplorer: show() called with version: " .. tostring(version))
   if mapExplorerWindow then
     mapExplorerWindow:raise()
     mapExplorerWindow:focus()
@@ -33,11 +126,23 @@ function MapExplorer.show(version)
   selectedVersion = version or 1098
   mapExplorerWindow = g_ui.displayUI('mapexplorer')
   
-  -- Restore last used map path
-  if selectedMapPath ~= '' then
-    local mapPathEdit = mapExplorerWindow:getChildById('mapPathEdit')
-    mapPathEdit:setText(selectedMapPath)
+  -- Setup FileBrowser
+  FileBrowser.setPanel(mapExplorerWindow)
+  FileBrowser.setOnFileSelect(function(path)
+    selectedMapPath = path
+    mapExplorerWindow:getChildById('pathEdit'):setText(path)
     mapExplorerWindow:getChildById('loadButton'):setEnabled(true)
+  end)
+  
+  -- Restore last path
+  if selectedMapPath ~= '' then
+    mapExplorerWindow:getChildById('pathEdit'):setText(selectedMapPath)
+    mapExplorerWindow:getChildById('loadButton'):setEnabled(true)
+    -- Also try to navigate file browser there
+    local dir = selectedMapPath:match("(.*[/\\])")
+    if dir then
+       FileBrowser.setPath(dir)
+    end
   end
   
   mapExplorerWindow:show()
@@ -52,577 +157,523 @@ function MapExplorer.hide()
   end
 end
 
-function MapExplorer.onBrowseMap()
-  -- g_platform.openFileDialog is not available in this version
-  -- Fallback: Focus the text edit and show a message
-  local mapPathEdit = mapExplorerWindow:getChildById('mapPathEdit')
-  mapPathEdit:setEnabled(true)
-  mapPathEdit:focus()
-  
-  local statusLabel = mapExplorerWindow:getChildById('statusLabel')
-  statusLabel:setText(tr('Please type the full path to the .otbm file'))
-  statusLabel:setColor('#ffff00')
-  
-  -- Enable load button if text is not empty
-  if mapPathEdit:getText() ~= '' then
-     mapExplorerWindow:getChildById('loadButton'):setEnabled(true)
-  end
-end
-
 function MapExplorer.onLoadMap()
-  g_logger.info("MapExplorer: onLoadMap() called")
-  if not selectedMapPath or selectedMapPath == '' then
-    return
-  end
+  if not selectedMapPath or selectedMapPath == '' then return end
   
-  -- Save settings
   g_settings.set('mapexplorer/lastMapPath', selectedMapPath)
   g_settings.save()
   
-  local mapPath = selectedMapPath
-  local version = selectedVersion
-  
-  g_logger.info('MapExplorer: Loading map: ' .. mapPath)
-  g_logger.info('MapExplorer: Client version: ' .. version)
-
-  -- Ensure dependencies are loaded
-  g_logger.info("MapExplorer: Checking dependencies...")
+  -- Load dependencies
   g_modules.ensureModuleLoaded('game_things')
   g_modules.ensureModuleLoaded('game_interface')
-  g_logger.info("MapExplorer: Dependencies loaded.")
+  g_modules.ensureModuleLoaded('game_outfit')
   
-  -- Disconnect if online
   if g_game.isOnline() then
     g_game.forceLogout()
     g_game.processGameEnd()
   end
   
-  -- Set client version
-  g_game.setClientVersion(version)
-  g_game.setProtocolVersion(g_game.getClientProtocolVersion(version))
+  g_game.setClientVersion(selectedVersion)
+  g_game.setProtocolVersion(g_game.getClientProtocolVersion(selectedVersion))
   
-  -- Load assets (DAT, OTB, SPR)
-  g_logger.info('MapExplorer: Loading DAT...')
-  local datPath = '/data/things/' .. version .. '/Tibia'
-  if not g_things.loadDat(datPath) then
-    g_logger.error("MapExplorer: Failed to load DAT: " .. datPath)
+  -- Load Assets
+  local dataDir = '/data/things/' .. selectedVersion
+  if not g_things.loadDat(dataDir .. '/Tibia') then
     displayErrorBox(tr('Error'), tr('Failed to load DAT file'))
-    return false
+    return
   end
-  
-  g_logger.info('MapExplorer: Loading OTB...')
-  local otbPath = '/data/things/' .. version .. '/items.otb'
-  
-  -- Load OTB (void function, handles errors internally via try/catch)
-  g_things.loadOtb(otbPath)
-  
-  -- Verify OTB loaded by checking isOtbLoaded()
+  g_things.loadOtb(dataDir .. '/items.otb')
   if not g_things.isOtbLoaded() then
-    g_logger.error("MapExplorer: OTB did not load successfully")
     displayErrorBox(tr('Error'), tr('Failed to load OTB file'))
-    return false
+    return
   end
-  
-  g_logger.info('MapExplorer: OTB loaded successfully')
-  
-  g_logger.info('MapExplorer: Loading SPR...')
-  local sprPath = '/data/things/' .. version .. '/Tibia'
-  if not g_sprites.loadSpr(sprPath) then
-    g_logger.error("MapExplorer: Failed to load SPR: " .. sprPath)
+  if not g_sprites.loadSpr(dataDir .. '/Tibia') then
     displayErrorBox(tr('Error'), tr('Failed to load SPR file'))
-    return false
+    return
   end
   
-  -- Load map
-  -- Normalize path separators
-  mapPath = mapPath:gsub("\\", "/")
+  MapExplorer.loadMapInternal(selectedMapPath)
   
-  -- Convert absolute path to virtual path if possible
-  local dataIndex = mapPath:find("/data/")
-  if dataIndex then
-    mapPath = mapPath:sub(dataIndex)
-  end
-  
-  local modulesIndex = mapPath:find("/modules/")
-  if modulesIndex then
-    mapPath = mapPath:sub(modulesIndex)
-  end
-  
-  g_logger.info("================================================")
-  g_logger.info("MapExplorer: Starting map load sequence")
-  g_logger.info("================================================")
-  
-  if selectedMapPath == '' then
-    g_logger.error("MapExplorer: No map path selected")
-    return false
-  end
-  
-  --========================================
-  -- STEP 1: Load OTBM File
-  --========================================
-  -- Note: mapPath already processed at lines 126-138 above
-  g_logger.info("STEP 1: Loading OTBM file: " .. mapPath)
-  
-  -- Load OTBM (void function, handles errors internally via try/catch)
-  g_map.loadOtbm(mapPath)
-  
-  -- Verify map loaded by checking if size is valid
-  local mapSize = g_map.getSize()
-  if mapSize.width == 0 or mapSize.height == 0 then
-    g_logger.error("STEP 1 FAILED: Map did not load (size is 0x0)")
-    local statusLabel = mapExplorerWindow:getChildById('statusLabel')
-    statusLabel:setText(tr('Failed to load map file'))
-    statusLabel:setColor('#ff0000')
-    return false
-  end
-  
-  g_logger.info("STEP 1 COMPLETE: OTBM loaded successfully")
-  g_logger.info("Map size: " .. mapSize.width .. "x" .. mapSize.height)
-  
-  -- Save last used path
-  g_settings.setValue('mapexplorer/lastMapPath', selectedMapPath)
-  
-  --========================================
-  -- STEP 2: Create Local Player
-  --========================================
-  g_logger.info("STEP 2: Creating local player for offline mode")
-  local player = LocalPlayer.create()
-  if not player then
-    g_logger.error("STEP 2 FAILED: Could not create LocalPlayer!")
-    return false
-  end
-  
-  -- Set player for offline mode (bypasses server walk validation)
-  player:setOfflineMode(true)
-  g_game.setLocalPlayer(player)
-  g_logger.info("STEP 2 COMPLETE: Local player created and set")
-  
-  -- Set player name for offline mode
-  player:setName("Map Explorer")
-  
-  -- Unlock walk to allow movement (locked by default)
-  player:unlockWalk()
-  g_logger.info("STEP 2: Player walk unlocked for movement")
-  g_logger.info("STEP 2: Offline mode enabled - walks will confirm locally")
-  
-  --========================================
-  -- STEP 3: Find Spawn Position
-  --========================================
-  g_logger.info("STEP 3: Finding spawn position")
-  local spawnPos = findSpawnPosition()
-  
-  if not spawnPos then
-    -- Fallback to map center
-    g_logger.warning("STEP 3: No spawn found, using map center")
-    spawnPos = {
-      x = math.floor(mapSize.width / 2),
-      y = math.floor(mapSize.height / 2),
-      z = 7
-    }
-  end
-  
-  g_logger.info("STEP 3 COMPLETE: Spawn position: " .. spawnPos.x .. "," .. spawnPos.y .. "," .. spawnPos.z)
-  
-  -- Verify tile exists at spawn
-  local spawnTile = g_map.getTile(spawnPos)
-  if not spawnTile then
-    g_logger.error("STEP 3 FAILED: No tile at spawn position!")
-    return false
-  end
-  debugTileContents(spawnPos, "Spawn Position")
-  
-  --========================================
-  -- STEP 4: Set Player Position
-  --========================================
-  g_logger.info("STEP 4: Setting player position")
-  player:setPosition(spawnPos)
-  
-  -- NOTE: m_allowAppearWalk defaults to false, which prevents auto-walk on position changes
-  -- Creature::onAppear() only calls walk() if m_allowAppearWalk = true
-  -- We DON'T call allowAppearWalk() to keep it false
-  g_logger.info("STEP 4: Auto-walk disabled (m_allowAppearWalk = false by default)")
-  
-  g_logger.info("STEP 4 COMPLETE: Player position set")
-  
-  --========================================
-  -- STEP 5: Add Player to Map Tile
-  --========================================
-  g_logger.info("STEP 5: Adding player to map tile")
-  
-  -- Add player to tile at spawn position (void function, no return value)
-  g_map.addThing(player, spawnPos, -1)
-  
-  -- Verify player was added by checking creatures on tile
-  local tile = g_map.getTile(spawnPos)
-  if not tile then
-    g_logger.error("STEP 5 FAILED: Tile disappeared after addThing")
-    return false
-  end
-  
-  local creatures = tile:getCreatures()
-  local playerFound = false
-  for _, creature in ipairs(creatures) do
-    if creature == player then
-      playerFound = true
-      break
-    end
-  end
-  
-  if not playerFound then
-    g_logger.error("STEP 5 FAILED: Player not found in tile creatures list")
-    g_logger.error("Creatures on tile: " .. #creatures)
-    return false
-  end
-  
-  g_logger.info("STEP 5 COMPLETE: Player added to map tile")
-  
-  -- Verify player is now in tile
-  spawnTile = g_map.getTile(spawnPos)
-  local creatures = spawnTile:getCreatures()
-  if not creatures or #creatures == 0 then
-    g_logger.error("STEP 5 VERIFICATION FAILED: Player not in tile creatures list!")
-    return false
-  end
-  g_logger.info("STEP 5 VERIFIED: Player is in tile (creature count: " .. #creatures .. ")")
-  debugTileContents(spawnPos, "After Adding Player")
-  
-  --========================================
-  -- STEP 6: Set Central Position (Awareness)
-  --========================================
-  g_logger.info("STEP 6: Setting central position (awareness)")
-  g_map.setCentralPosition(spawnPos)
-  g_logger.info("STEP 6 COMPLETE: Central position set, awareness updated")
-  
-  -- Verify awareness tiles
-  verifyMapState("After Setting Central Position")
-  
-  --========================================
-  -- STEP 7: Set World Light
-  --========================================
-  g_logger.info("STEP 7: Setting world light")
-  g_map.setLight({intensity = 255, color = 215})
-  g_logger.info("STEP 7 COMPLETE: World light set to full daylight")
-  
-  --========================================
-  -- STEP 8: Start Game (processGameStart)
-  --========================================
-  g_logger.info("STEP 8: Starting game state (processGameStart)")
-  
-  -- Note: processEnterGame is NOT bound to Lua - it's only called by ProtocolGame
-  -- In offline mode, we skip directly to processGameStart, which handles:
-  -- - Setting g_game online
-  -- - Synchronizing fight modes
-  -- - Calling onGameStart callback
-  -- - Starting ping events (if features enabled)
-  g_game.processGameStart()
-  
-  g_logger.info("STEP 8 COMPLETE: Game state initialized")
-  g_logger.info("Game is online: " .. tostring(g_game.isOnline()))
-  
-  -- Manually ensure game_walking module binds keys for offline mode
-  if modules.game_walking and modules.game_walking.onGameStart then
-    g_logger.info("STEP 8: Triggering game_walking.onGameStart() for keyboard bindings")
-    modules.game_walking.onGameStart()
-  else
-    g_logger.warning("STEP 8: game_walking module not available!")
-  end
-
-  -- Bind PageUp/PageDown for Z-axis movement
-  -- Bind to root widget to ensure we catch it even if window loses focus
-  local rootWidget = modules.game_interface.getRootPanel()
-  g_keyboard.bindKeyDown('PageUp', function() 
-    g_logger.info("PageUp pressed")
-    changeFloor(-1) 
-  end, rootWidget)
-  
-  g_keyboard.bindKeyDown('PageDown', function() 
-    g_logger.info("PageDown pressed")
-    changeFloor(1) 
-  end, rootWidget)
-  
-  g_logger.info("STEP 8: Bound PageUp/PageDown for vertical movement to root widget")
-  
-  --========================================
-  -- STEP 9: Bind Camera to Player
-  --========================================
-  g_logger.info("STEP 9: Binding camera to player")
-  if modules.game_interface then
-    local mapPanel = modules.game_interface.getMapPanel()
-    if mapPanel then
-      mapPanel:followCreature(player)
-      g_logger.info("STEP 10 COMPLETE: Camera bound to player")
-    else
-      g_logger.error("STEP 10 FAILED: No map panel found!")
-      return false
-    end
-  else
-    g_logger.error("STEP 10 FAILED: game_interface module not loaded!")
-    return false
-  end
-  
-  --========================================
-  -- STEP 11: Final Verification
-  --========================================
-  g_logger.info("STEP 11: Final state verification")
-  if not verifyMapState("Final State") then
-    g_logger.error("STEP 11 FAILED: Final verification failed")
-    return false
-  end
-  g_logger.info("STEP 11 COMPLETE: All verifications passed")
-  
-  --========================================
-  -- SUCCESS!
-  --========================================
-  g_logger.info("================================================")
-  g_logger.info("MAP LOADED SUCCESSFULLY - Rendering should work!")
-  g_logger.info("================================================")
-  
-  -- Update UI
-  local statusLabel = mapExplorerWindow:getChildById('statusLabel')
-  statusLabel:setText(tr('Map loaded successfully!'))
-  statusLabel:setColor('#00ff00')
-  
-  -- Hide EnterGame window
-  if EnterGame then EnterGame.hide() end
-  
-  -- Close explorer window
   MapExplorer.hide()
   
-  return true
+  -- Hide EnterGame window
+  if modules.client_entergame and modules.client_entergame.EnterGame then
+    modules.client_entergame.EnterGame.hide()
+  end
 end
 
-function findSpawnPosition()
-  -- Try to find a town spawn first
-  local towns = g_towns.getTowns()
-  if #towns > 0 then
-    local townPos = towns[1]:getPos()
-    if g_map.getTile(townPos) then
-      return townPos
-    end
-    g_logger.warning("Town spawn has no tile, searching nearby...")
+function MapExplorer.loadMapInternal(path)
+  g_logger.info("Loading map: " .. path)
+  
+  local status, err = pcall(function() 
+    g_map.loadOtbm(path) 
+  end)
+  
+  if not status then
+    g_logger.error("Failed to load OTBM: " .. err)
+    displayErrorBox(tr('Error'), tr('Failed to load map file: ' .. err))
+    return
   end
   
-  -- Fallback to map center
+  -- GENERATE MINIMAP FROM MAP TILES (Fix for minimap staying blank)
+  g_minimap.generateFromMap()
+  g_logger.info("Minimap generated from map tiles")
+  
+  local mapSize = g_map.getSize()
+  if mapSize.width == 0 then
+    displayErrorBox(tr('Error'), tr('Map loaded but size is 0x0'))
+    return
+  end
+  
+  -- Setup Player
+  local player = LocalPlayer.create()
+  player:setOfflineMode(true)
+  g_game.setLocalPlayer(player) 
+  
+  player:setName("Glaszcz Koldre")
+  player:setHealth(150, 150)
+  player:setMana(90, 90)
+  player:setLevel(8, 0)
+  player:setSpeed(220)
+  player:setBaseSpeed(220)
+  -- Fix: Use correct keys for outfit (type, head, body, legs, feet)
+  player:setOutfit({type = 159, head = 29, body = 86, legs = 105, feet = 124})
+  
+  -- Try to load state
+  local stateLoaded = MapExplorer.loadMapState()
+  
+  if not stateLoaded then
+    -- Default spawn
+    local spawnPos = MapExplorer.findSpawnPosition()
+    if not spawnPos then
+       -- Fallback to center if no valid tile found
+       spawnPos = {x = math.floor(mapSize.width / 2), y = math.floor(mapSize.height / 2), z = 7}
+    end
+    player:setPosition(spawnPos)
+    g_map.addThing(player, spawnPos, -1)
+    g_map.setCentralPosition(spawnPos)
+  else
+     local pos = player:getPosition()
+     g_map.addThing(player, pos, -1)
+     g_map.setCentralPosition(pos)
+  end
+  
+  g_map.setLight({intensity = 255, color = 215})
+  g_game.processGameStart()
+  
+  -- Start hot-reload watcher
+  lastModTime = g_resources.getFileModificationTime(path)
+  if reloadEvent then removeEvent(reloadEvent) end
+  reloadEvent = scheduleEvent(MapExplorer.checkFileModification, 500)
+end
+
+function MapExplorer.checkFileModification()
+  if not selectedMapPath or selectedMapPath == "" then return end
+  
+  local modTime = g_resources.getFileModificationTime(selectedMapPath)
+  if modTime ~= "0" and modTime ~= lastModTime then
+    if lastModTime ~= "0" then
+       g_logger.info("Map file changed, reloading...")
+       MapExplorer.reloadMap()
+    end
+    lastModTime = modTime
+  end
+  
+  reloadEvent = scheduleEvent(MapExplorer.checkFileModification, 500)
+end
+
+function MapExplorer.reloadMap()
+  local player = g_game.getLocalPlayer()
+  if not player then return end
+  
+  -- Save state temporarily (in memory)
+  local pos = player:getPosition()
+  local outfit = player:getOutfit()
+  local speed = player:getSpeed()
+  
+  g_map.clean()
+  
+  local status, err = pcall(function() 
+    g_map.loadOtbm(selectedMapPath) 
+  end)
+  
+  if not status then
+    g_logger.error("Reload failed: " .. err)
+  end
+  
+  -- Restore player
+  player:setPosition(pos)
+  player:setOutfit(outfit)
+  player:setSpeed(speed)
+  player:setBaseSpeed(speed)
+  
+  g_map.addThing(player, pos, -1)
+  g_map.setCentralPosition(pos)
+end
+
+function MapExplorer.onGameStart()
+  -- Show Explorer Panel
+  if not explorerPanel then
+    explorerPanel = g_ui.createWidget('ExplorerPanel', modules.game_interface.getRootPanel())
+  end
+  explorerPanel:show()
+  
+  -- Start update loop for coords
+  MapExplorer.updatePanelLoop()
+  
+  -- Start auto-save loop
+  MapExplorer.autoSaveLoop()
+  
+  -- Bind keys
+  g_keyboard.bindKeyDown('Ctrl+Shift+E', function() 
+    if explorerPanel:isVisible() then explorerPanel:hide() else explorerPanel:show() end
+  end)
+end
+
+function MapExplorer.onGameEnd()
+  if explorerPanel then
+    explorerPanel:hide()
+  end
+  if reloadEvent then
+    removeEvent(reloadEvent)
+    reloadEvent = nil
+  end
+  if updatePanelEvent then
+    removeEvent(updatePanelEvent)
+    updatePanelEvent = nil
+  end
+  if autoSaveEvent then
+    removeEvent(autoSaveEvent)
+    autoSaveEvent = nil
+  end
+  
+  MapExplorer.saveMapState()
+end
+
+function MapExplorer.updatePanelLoop()
+  if explorerPanel and explorerPanel:isVisible() then
+    local player = g_game.getLocalPlayer()
+    if player then
+      local pos = player:getPosition()
+      
+      -- Only update if position changed significantly to avoid fighting user input
+      if not lastPlayerPos or lastPlayerPos.x ~= pos.x or lastPlayerPos.y ~= pos.y or lastPlayerPos.z ~= pos.z then
+        lastPlayerPos = pos
+        
+        local posX = explorerPanel:getChildById('posX')
+        local posY = explorerPanel:getChildById('posY')
+        local posZ = explorerPanel:getChildById('posZ')
+        
+        -- Check focus to prevent overwriting while typing
+        if not posX:isFocused() then posX:setText(pos.x) end
+        if not posY:isFocused() then posY:setText(pos.y) end
+        if not posZ:isFocused() then posZ:setText(pos.z) end
+      end
+    end
+  end
+  updatePanelEvent = scheduleEvent(MapExplorer.updatePanelLoop, 100)
+end
+
+function MapExplorer.autoSaveLoop()
+  MapExplorer.saveMapState()
+  autoSaveEvent = scheduleEvent(MapExplorer.autoSaveLoop, 5000) -- Save every 5 seconds
+end
+
+function MapExplorer.onTeleport()
+  local x = tonumber(explorerPanel:getChildById('posX'):getText())
+  local y = tonumber(explorerPanel:getChildById('posY'):getText())
+  local z = tonumber(explorerPanel:getChildById('posZ'):getText())
+  
+  if x and y and z then
+    local player = g_game.getLocalPlayer()
+    if player then
+      local pos = {x=x, y=y, z=z}
+      -- Remove from old tile
+      local oldTile = g_map.getTile(player:getPosition())
+      if oldTile then oldTile:removeThing(player) end
+      
+      player:setPosition(pos)
+      
+      local newTile = g_map.getTile(pos)
+      if newTile then 
+        newTile:addThing(player, -1)
+      else
+        -- Create tile if needed? Or just float.
+        -- If we want to see void, we need to be on a tile usually?
+        -- Actually, if no tile, we can't addThing to it.
+        -- But we can setCentralPosition.
+      end
+      g_map.setCentralPosition(pos)
+      lastPlayerPos = pos -- Update last known pos to prevent overwrite
+    end
+  end
+end
+
+local noclipKeys = {
+  ['Up'] = {x=0, y=-1, z=0},
+  ['Down'] = {x=0, y=1, z=0},
+  ['Left'] = {x=-1, y=0, z=0},
+  ['Right'] = {x=1, y=0, z=0},
+  ['Numpad8'] = {x=0, y=-1, z=0},
+  ['Numpad2'] = {x=0, y=1, z=0},
+  ['Numpad4'] = {x=-1, y=0, z=0},
+  ['Numpad6'] = {x=1, y=0, z=0},
+  ['Numpad7'] = {x=-1, y=-1, z=0},
+  ['Numpad9'] = {x=1, y=-1, z=0},
+  ['Numpad1'] = {x=-1, y=1, z=0},
+  ['Numpad3'] = {x=1, y=1, z=0},
+}
+
+function MapExplorer.moveNoClip(dir)
+  local player = g_game.getLocalPlayer()
+  if not player then return end
+  
+  local pos = player:getPosition()
+  pos.x = pos.x + dir.x
+  pos.y = pos.y + dir.y
+  pos.z = pos.z + dir.z
+  
+  -- Use new instant position method (handles tiles, camera, and events)
+  player:setPositionInstant(pos, true)  -- true = update camera
+  
+  lastPlayerPos = pos  -- Update panel tracking
+end
+
+function MapExplorer.toggleNoClip(enabled)
+  g_logger.info("MapExplorer: toggleNoClip " .. tostring(enabled))
+  local player = g_game.getLocalPlayer()
+  if player then
+    player:setNoClipMode(enabled)
+  end
+  
+  -- Don't override movement keys - let the normal walking system handle it
+  -- NoClip mode is now properly integrated at the C++ level
+  -- The game will automatically bypass collision checks when m_noClipMode is true
+end
+
+function MapExplorer.onSpeedChange(value)
+  g_logger.info("MapExplorer: onSpeedChange " .. tostring(value))
+  local player = g_game.getLocalPlayer()
+  if player then
+    player:setSpeed(value)
+    player:setBaseSpeed(value)
+  end
+end
+
+function MapExplorer.saveMapState()
+  if not selectedMapPath or selectedMapPath == "" then return end
+  local player = g_game.getLocalPlayer()
+  if not player then return end
+  
+  local key = 'map_state_' .. g_crypt.md5Encode(selectedMapPath)
+  local state = {
+    pos = player:getPosition(),
+    outfit = player:getOutfit(),
+    speed = player:getSpeed()
+  }
+  g_settings.setNode(key, state)
+  g_settings.save()
+end
+
+function MapExplorer.loadMapState()
+  if not selectedMapPath or selectedMapPath == "" then return false end
+  local key = 'map_state_' .. g_crypt.md5Encode(selectedMapPath)
+  local state = g_settings.getNode(key)
+  
+  if state and state.pos then
+    local player = g_game.getLocalPlayer()
+    if player then
+      player:setPosition(state.pos)
+      if state.outfit then 
+          g_logger.info("Restoring outfit from state (SKIPPED to force hardcoded)")
+          -- player:setOutfit(state.outfit) 
+      end
+      if state.speed then 
+         player:setSpeed(state.speed) 
+         if explorerPanel then
+            explorerPanel:getChildById('speedScroll'):setValue(state.speed)
+         end
+      end
+      return true
+    end
+  end
+  return false
+end
+
+function MapExplorer.findSpawnPosition()
+  -- Try to find a valid tile near the center of the map
   local mapSize = g_map.getSize()
   local centerX = math.floor(mapSize.width / 2)
   local centerY = math.floor(mapSize.height / 2)
   local centerZ = 7
   
-  -- Helper function to find nearest valid tile in spiral pattern
-  local function findNearestTile(startX, startY, startZ, maxRadius)
-    -- Check center first
-    if g_map.getTile({x=startX, y=startY, z=startZ}) then
-      return {x=startX, y=startY, z=startZ}
-    end
-    
-    -- Spiral search outward
-    for radius = 1, maxRadius do
-      for z = startZ, 0, -1 do  -- Try current floor first, then go up
-        -- Search in a square pattern around the center
-        for dx = -radius, radius do
-          for dy = -radius, radius do
-            -- Only check the perimeter of the current radius
-            if math.abs(dx) == radius or math.abs(dy) == radius then
-              local pos = {x=startX + dx, y=startY + dy, z=z}
-              local tile = g_map.getTile(pos)
-              if tile and tile:isWalkable() then
-                g_logger.info("Found valid tile at offset (" .. dx .. "," .. dy .. ") from center")
-                return pos
-              end
-            end
-          end
-        end
-      end
-      
-      -- Also try lower floors
-      for z = startZ + 1, 15 do
-        for dx = -radius, radius do
-          for dy = -radius, radius do
-            if math.abs(dx) == radius or math.abs(dy) == radius then
-              local pos = {x=startX + dx, y=startY + dy, z=z}
-              local tile = g_map.getTile(pos)
-              if tile and tile:isWalkable() then
-                g_logger.info("Found valid tile at offset (" .. dx .. "," .. dy .. ") floor " .. z)
-                return pos
-              end
-            end
-          end
+  -- Spiral search for a walkable tile
+  local radius = 0
+  local maxRadius = 100 -- Limit search
+  
+  while radius < maxRadius do
+    for x = centerX - radius, centerX + radius do
+      for y = centerY - radius, centerY + radius do
+        local pos = {x=x, y=y, z=centerZ}
+        local tile = g_map.getTile(pos)
+        if tile and tile:isWalkable() then
+          return pos
         end
       end
     end
-    
-    return nil
+    radius = radius + 10 -- Skip some tiles for speed
   end
   
-  -- Search for nearest valid tile within 200 tile radius
-  return findNearestTile(centerX, centerY, centerZ, 200)
+  -- Fallback to towns if available
+  local towns = g_towns.getTowns()
+  if #towns > 0 then
+    local townPos = towns[1]:getPos()
+    if g_map.getTile(townPos) then return townPos end
+  end
+  
+  return nil
 end
 
-function changeFloor(delta)
+function MapExplorer.onLightChange(value)
+  g_map.setLight({intensity = value, color = 215})
+end
+
+function MapExplorer.floorUp()
   local player = g_game.getLocalPlayer()
   if not player then return end
-  
   local pos = player:getPosition()
-  local newZ = pos.z + delta
-  
-  -- Validate Z range (0-15)
-  if newZ < 0 or newZ > 15 then
-    g_logger.warning("Cannot move to floor " .. newZ .. " (out of range)")
-    return
+  if pos.z > 0 then
+    pos.z = pos.z - 1
+    player:setPosition(pos)
+    g_map.setCentralPosition(pos)
   end
-  
-  local newPos = {x=pos.x, y=pos.y, z=newZ}
-  
-  -- Check if there is a tile at the new position
-  -- If not, try to find a valid tile nearby on that floor
-  local tile = g_map.getTile(newPos)
-  if not tile then
-    -- Try to find a valid tile nearby
-    local found = false
-    for dx = -1, 1 do
-      for dy = -1, 1 do
-        local checkPos = {x=newPos.x+dx, y=newPos.y+dy, z=newPos.z}
-        if g_map.getTile(checkPos) then
-          newPos = checkPos
-          found = true
-          break
-        end
-      end
-      if found then break end
-    end
-    
-    if not found then
-       g_logger.warning("No tile found at " .. newPos.x .. "," .. newPos.y .. "," .. newPos.z)
-       -- Force create a tile if none exists? No, better to just not move if there's nothing there
-       -- But for map explorer, maybe we WANT to move into the void?
-       -- Let's allow it, but warn
-    end
-  end
-  
-  g_logger.info("Changing floor to " .. newZ)
-  
-  -- Manually handle tile swap (similar to C++ fix)
-  local oldTile = g_map.getTile(pos)
-  if oldTile then
-    oldTile:removeThing(player)
-  end
-  
-  player:setPosition(newPos)
-  
-  local newTile = g_map.getTile(newPos)
-  if newTile then
-    newTile:addThing(player, -1)
-  else
-    -- If no tile exists, we might need to create one or just let the player float?
-    -- g_map.createTile(newPos) -- This might be needed if we want to see the void
-  end
-  
-  -- Update camera
-  g_map.setCentralPosition(newPos)
 end
 
-function MapExplorer.onMapPathChange(widget, text)
-  selectedMapPath = text
-  local loadButton = mapExplorerWindow:getChildById('loadButton')
-  loadButton:setEnabled(text ~= '')
-end
-
--- ============================================
--- VERIFICATION & DEBUG HELPER FUNCTIONS
--- ============================================
-
-function verifyMapState(context)
-  g_logger.info("=== VERIFYING STATE: " .. context .. " ===")
-  
-  -- Check player
+function MapExplorer.floorDown()
   local player = g_game.getLocalPlayer()
-  if not player then
-    g_logger.error("  FAIL: No local player")
-    return false
+  if not player then return end
+  local pos = player:getPosition()
+  if pos.z < 15 then
+    pos.z = pos.z + 1
+    player:setPosition(pos)
+    g_map.setCentralPosition(pos)
   end
-  g_logger.info("  Player exists: " .. (player:getName() or "Offline Player"))
+end
+
+function MapExplorer.validateOutfitType(typeId)
+  if typeId <= 0 then return false end
   
-  -- Check player position
-  local playerPos = player:getPosition()
-  if playerPos then
-    g_logger.info("  Player position: " .. playerPos.x .. "," .. playerPos.y .. "," .. playerPos.z)
-  else
-    g_logger.error("  FAIL: Player has no position")
-    return false
-  end
+  -- We use pcall to catch any potential crashes, but getThingType might log errors if invalid
+  -- There is no way to check validity without triggering the error log in current API
+  local status, result = pcall(function() 
+    return g_things.getThingType(typeId, ThingCategoryCreature)
+  end)
   
-  -- Check if player is on a tile
-  local tile = g_map.getTile(playerPos)
-  if tile then
-    g_logger.info("  Tile exists at player position")
-    local creatures = tile:getCreatures()
-    if creatures then
-      g_logger.info("  Creatures on tile: " .. #creatures)
-      if #creatures == 0 then
-        g_logger.warning("  WARNING: Tile has no creatures")
-      end
-    end
-  else
-    g_logger.error("  FAIL: No tile at player position!")
-    return false
-  end
+  if not status or not result then return false end
   
-  -- Check tiles around player
-  local tileCount = 0
-  for dx = -5, 5 do
-    for dy = -5, 5 do
-      local checkPos = {x=playerPos.x+dx, y=playerPos.y+dy, z=playerPos.z}
-      if g_map.getTile(checkPos) then
-        tileCount = tileCount + 1
-      end
-    end
-  end
-  g_logger.info("  Tiles in 11x11 area: " .. tileCount .. "/121")
+  -- Check if we got a valid thing type (not the null one)
+  -- The null thing type usually has ID 0 or doesn't match the requested ID
+  if result:getId() ~= typeId then return false end
   
-  -- Check camera
-  if modules.game_interface then
-    local mapPanel = modules.game_interface.getMapPanel()
-    if mapPanel then
-      local following = mapPanel:getFollowingCreature()
-      if following then
-        g_logger.info("  Camera following: " .. (following:getName() or "Offline Player"))
-      else
-        g_logger.warning("  WARNING: Camera not following")
-      end
-    else
-      g_logger.warning("  WARNING: No map panel")
-    end
-  end
-  
-  g_logger.info("=== VERIFICATION COMPLETE ===")
   return true
 end
 
-function debugTileContents(pos, label)
-  g_logger.info("=== TILE DEBUG: " .. label .. " ===")
-  local tile = g_map.getTile(pos)
-  if not tile then
-    g_logger.info("  No tile at position")
-    return
-  end
+function MapExplorer.getMaxAddonsForOutfit(typeId)
+  -- Addon validation heuristic
+  -- Most outfits support 0-3 addons, but server would normally validate
+  local thingType = g_things.getThingType(typeId, ThingCategoryCreature)
+  if not thingType then return 0 end
   
-  local ground = tile:getGround()
-  if ground then
-    g_logger.info("  Ground: ID " .. ground:getId())
-  else
-    g_logger.info("  No ground")
-  end
+  -- Conservative: assume all outfits support max addons to avoid limiting user
+  -- In production, this would read from .dat metadata
+  return 3
+end
+
+function MapExplorer.openOutfitWindow()
+  g_logger.info("MapExplorer: openOutfitWindow() called")
+  local player = g_game.getLocalPlayer()
+  if not player then return end
   
-  local items = tile:getItems()
-  if items then
-    g_logger.info("  Items: " .. #items)
-  end
+  -- Generate validated outfit list
+  local outfits = {}
+  local validOutfitCount = 0
   
-  local creatures = tile:getCreatures()
-  if creatures then
-    g_logger.info("  Creatures: " .. #creatures)
-    for i, creature in ipairs(creatures) do
-      g_logger.info("    " .. i .. ": " .. (creature:getName() or "Unknown"))
+  -- Scan for valid outfits
+  -- Stop after 10 consecutive invalid IDs to avoid spamming errors for the rest of the range
+  local consecutiveInvalid = 0
+  for i = 1, 2000 do
+    if MapExplorer.validateOutfitType(i) then
+      local maxAddons = MapExplorer.getMaxAddonsForOutfit(i)
+      -- Format: {id, name, maxAddons}
+      table.insert(outfits, {i, "Outfit " .. i, maxAddons})
+      validOutfitCount = validOutfitCount + 1
+      consecutiveInvalid = 0
+    else
+      consecutiveInvalid = consecutiveInvalid + 1
+      if consecutiveInvalid >= 10 then
+        break
+      end
     end
+  end
+  
+  g_logger.info("Found " .. validOutfitCount .. " valid outfits")
+  
+  -- Generate mount list (if mounts feature enabled)
+  local mounts = {}
+  if g_game.getFeature(GamePlayerMounts) then
+    for i = 1, 200 do
+      if MapExplorer.validateOutfitType(i) then
+        table.insert(mounts, {i, "Mount " .. i})
+      end
+    end
+  end
+  
+  -- CRITICAL: Never pass empty lists - always include "None" option
+  -- This prevents Lua errors when the outfit window iterates over empty tables
+  local wings = {{0, "None"}}
+  local auras = {{0, "None"}}
+  local healthBars = {{0, "None"}}
+  local manaBars = {{0, "None"}}
+  
+  -- CRITICAL: Shader list must include "outfit_default"
+  -- The C++ rendering code expects this shader to exist
+  local shaders = {
+    {0, "Default", "outfit_default"},  -- Must have outfit_default
+    {1, "None", "no_shader"}
+  }
+  
+  -- Get current outfit (ensure all fields exist with defaults)
+  local currentOutfit = player:getOutfit()
+  currentOutfit.type = currentOutfit.type or 0
+  currentOutfit.head = currentOutfit.head or 0
+  currentOutfit.body = currentOutfit.body or 0
+  currentOutfit.legs = currentOutfit.legs or 0
+  currentOutfit.feet = currentOutfit.feet or 0
+  currentOutfit.addons = currentOutfit.addons or 0
+  currentOutfit.mount = currentOutfit.mount or 0
+  currentOutfit.wings = currentOutfit.wings or 0
+  currentOutfit.aura = currentOutfit.aura or 0
+  currentOutfit.shader = currentOutfit.shader or "outfit_default"  -- Critical default
+  currentOutfit.healthBar = currentOutfit.healthBar or 0
+  currentOutfit.manaBar = currentOutfit.manaBar or 0
+  
+  -- Validate addon value against outfit capabilities
+  local maxAddons = MapExplorer.getMaxAddonsForOutfit(currentOutfit.type)
+  if currentOutfit.addons > maxAddons then
+    g_logger.warning(string.format("Outfit %d only supports %d addons, clamping from %d", 
+      currentOutfit.type, maxAddons, currentOutfit.addons))
+    currentOutfit.addons = maxAddons
+  end
+  
+  -- Call outfit window with error handling
+  local status, err = pcall(function()
+    if modules.game_outfit then
+      modules.game_outfit.create(currentOutfit, outfits, mounts, wings, auras, shaders, healthBars, manaBars)
+    end
+  end)
+  
+  if not status then
+    g_logger.error("Failed to open outfit window: " .. tostring(err))
+    displayErrorBox("Outfit Error", "Failed to open outfit window. Check console for details.")
   end
 end

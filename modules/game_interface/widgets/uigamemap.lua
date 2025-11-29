@@ -109,6 +109,13 @@ function UIGameMap:blockNextMouseRelease(postAction)
 end
 
 function UIGameMap:onMouseRelease(mousePosition, mouseButton)
+  if not g_game.isOnline() then
+    local player = g_game.getLocalPlayer()
+    if not player then
+      return false
+    end
+  end
+
   if not self.allowNextRelease and not self.markingMouseRelease then
     return true
   end

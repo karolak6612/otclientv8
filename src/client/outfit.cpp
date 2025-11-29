@@ -43,6 +43,21 @@ Outfit::Outfit()
 
 void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase, bool animate, LightView* lightView, bool ui)
 {
+    // ADD VALIDATION: Check for invalid outfit before rendering
+    if (m_id == 0 && m_category == ThingCategoryCreature) {
+        g_logger.debug("Drawing null outfit (id=0), skipping render");
+        return;  // Nothing to render for null creature outfit
+    }
+    
+    // Additional validation: Check if thing type exists
+    if (m_category == ThingCategoryCreature && m_id > 0) {
+        auto type = g_things.rawGetThingType(m_id, ThingCategoryCreature);
+        if (!type) {
+            g_logger.debug(stdext::format("Outfit type %d not found, skipping render", m_id));
+            return;  // Can't render invalid outfit
+        }
+    }
+    
     // direction correction
     if (m_category != ThingCategoryCreature)
         direction = Otc::North;

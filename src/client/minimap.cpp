@@ -22,6 +22,7 @@
 
 
 #include "minimap.h"
+#include "map.h"
 #include "tile.h"
 #include "game.h"
 #include "spritemanager.h"
@@ -481,4 +482,24 @@ void Minimap::saveOtmm(const std::string& fileName)
     } catch (std::exception& e) {
         g_logger.error(stdext::format("failed to save OTMM minimap: %s", e.what()));
     }
+}
+
+void Minimap::generateFromMap()
+{
+    g_logger.info("Generating minimap from loaded map tiles...");
+    int tilesProcessed = 0;
+    
+    // Iterate through all loaded map tiles
+    for(int z = 0; z <= Otc::MAX_Z; ++z) {
+        TileList tiles = g_map.getTiles(z);
+        for(TileList::iterator it = tiles.begin(); it != tiles.end(); ++it) {
+            const TilePtr& tile = *it;
+            if(tile) {
+                updateTile(tile->getPosition(), tile);
+                tilesProcessed++;
+            }
+        }
+    }
+    
+    g_logger.info(stdext::format("Minimap generation complete: %d tiles processed", tilesProcessed));
 }

@@ -753,12 +753,30 @@ function processMouseAction(menuPosition, mouseButton, autoWalkPos, lookThing, u
   player:stopAutoWalk()  
 
   if autoWalkPos and keyboardModifiers == KeyboardNoModifier and (mouseButton == MouseLeftButton or mouseButton == MouseTouch2 or mouseButton == MouseTouch3) then
+    -- ADD BOUNDS CHECK FOR OFFLINE MODE
+    if not g_game.isOnline() then
+      if not g_map.isPositionWithinMapBounds(autoWalkPos) then
+        g_logger.debug("Click on void position outside map bounds, ignoring walk")
+        modules.game_textmessage.displayFailureMessage(tr('Sorry, not possible.'))
+        return false
+      end
+    end
+    
     local autoWalkTile = g_map.getTile(autoWalkPos)
     if autoWalkTile and not autoWalkTile:isWalkable(true) then
       modules.game_textmessage.displayFailureMessage(tr('Sorry, not possible.'))
       return false
     end
-    player:autoWalk(autoWalkPos)
+    g_logger.info(string.format("[CLICK WALK DEBUG] About to call autoWalk to (%d,%d,%d)", autoWalkPos.x, autoWalkPos.y, autoWalkPos.z))
+    local status, err = pcall(function()
+      player:autoWalk(autoWalkPos)
+    end)
+    if not status then
+      g_logger.error("[CLICK WALK DEBUG] CRASH in player:autoWalk - " .. tostring(err))
+      displayErrorBox("Walk Error", "Failed to walk: " .. tostring(err))
+      return false
+    end
+    g_logger.info("[CLICK WALK DEBUG] autoWalk call completed successfully")
     return true
   end
 

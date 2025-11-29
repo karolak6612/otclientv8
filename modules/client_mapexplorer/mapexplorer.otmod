@@ -4,7 +4,7 @@ Module
   author: edubart
   website: https://github.com/edubart/otclient
   priority: 750
-  scripts: [ mapexplorer ]
+  scripts: [ filebrowser, mapexplorer ]
   dependencies: [ game_things, game_interface ]
   @onLoad: init()
   @onUnload: terminate()

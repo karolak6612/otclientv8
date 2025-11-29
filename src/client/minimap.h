@@ -101,6 +101,8 @@ public:
     bool loadOtmm(const std::string& fileName);
     void saveOtmm(const std::string& fileName);
 
+    void generateFromMap();
+
 private:
     Rect calcMapRect(const Rect& screenRect, const Position& mapCenter, float scale);
     bool hasBlock(const Position& pos) { return m_tileBlocks[pos.z].find(getBlockIndex(pos)) != m_tileBlocks[pos.z].end(); }
