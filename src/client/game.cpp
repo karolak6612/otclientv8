@@ -742,7 +742,7 @@ void Game::walk(Otc::Direction direction, bool withPreWalk)
                 
                 // Schedule central position update to keep camera following
                 g_dispatcher.scheduleEvent([this, newPos] {
-                    if (m_localPlayer && m_online) {
+                    if (m_localPlayer && (m_online || m_localPlayer->isOfflineMode())) {
                         g_map.setCentralPosition(newPos);
                         g_logger.info(stdext::format("[Offline-New] Central position updated: (%d,%d,%d)", 
                             newPos.x, newPos.y, newPos.z));
@@ -793,7 +793,7 @@ void Game::walk(Otc::Direction direction, bool withPreWalk)
             Position oldPos = m_localPlayer->getPosition();
             Position newPos = oldPos.translatedToDirection(direction);
             g_dispatcher.scheduleEvent([this, newPos] {
-                if (m_localPlayer && m_online) {
+                if (m_localPlayer && (m_online || m_localPlayer->isOfflineMode())) {
                     g_map.setCentralPosition(newPos);
                     g_logger.info(stdext::format("[Offline-Old] Central position updated: (%d,%d,%d)",
                         newPos.x, newPos.y, newPos.z));

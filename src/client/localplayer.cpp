@@ -382,6 +382,23 @@ void LocalPlayer::updateWalk()
 
     // Offline mode: Commit prewalk immediately without server confirmation
     if (m_offlineMode && m_walking && isPreWalking() && m_walkTimer.ticksElapsed() >= getStepDuration()) {
+        // Fix: Update logical position to match the visual movement
+        if (!m_preWalking.empty()) {
+            Position newPos = m_preWalking.front();
+            TilePtr oldTile = getTile();
+            TilePtr newTile = g_map.getTile(newPos);
+            
+            if (oldTile) {
+                oldTile->removeThing(asLocalPlayer());
+            }
+            
+            setPosition(newPos);
+            
+            if (newTile) {
+                newTile->addThing(asLocalPlayer(), -1);
+            }
+        }
+
         m_lastPrewalkDone = true;
         // In offline mode, clear prewalk immediately - no need to wait for server
         m_preWalking.clear();
@@ -430,6 +447,24 @@ void LocalPlayer::onAppear()
     if(!m_oldPosition.isInRange(m_position,1,1))
         lockWalk();
     */
+}
+
+void LocalPlayer::onDisappear()
+{
+    // Offline mode: Don't disappear - no server desync possible
+    if (m_offlineMode) {
+        g_logger.info(stdext::format("[Offline-%s] Skipping disappear logic - no position reset needed (pos: %s)", 
+            g_game.getFeature(Otc::GameNewWalking) ? "New" : "Old", 
+            m_position.toString()));
+        return;
+    }
+
+    g_logger.info(stdext::format("[Online-%s] LocalPlayer::onDisappear() called (pos: %s)", 
+        g_game.getFeature(Otc::GameNewWalking) ? "New" : "Old", 
+        m_position.toString()));
+
+    // Online mode: Call base class implementation
+    Creature::onDisappear();
 }
 
 void LocalPlayer::onPositionChange(const Position& newPos, const Position& oldPos)

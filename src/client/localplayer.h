@@ -111,6 +111,7 @@ public:
     bool isLocalPlayer() override { return true; }
 
     void onAppear() override;
+    void onDisappear() override;
     void onPositionChange(const Position& newPos, const Position& oldPos) override;
 
     // pre walking
