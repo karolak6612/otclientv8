@@ -48,7 +48,6 @@ Visualize and test your spawn XML files!
 *   **Load Spawns**: In the Map Explorer, open the "Spawn Simulator" panel.
 *   **Select File**: Choose your `spawn.xml` file.
 *   **Visualize**: See monsters spawn in real-time based on the configuration.
-*   **Heatmap**: (Coming Soon) Visualize spawn density.
 
 ### 3. Explorer Tools
 Customize your experience!
