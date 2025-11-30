@@ -218,6 +218,38 @@ function UIMiniWindow:onDragEnter(mousePos)
     parent:removeChild(self)
     containerParent:addChild(self)
     parent:saveChildren()
+    
+    -- Enable all resize borders when floating
+    local rightResizeBorder = self:getChildById('rightResizeBorder')
+    local leftResizeBorder = self:getChildById('leftResizeBorder')
+    local topResizeBorder = self:getChildById('topResizeBorder')
+    
+    if rightResizeBorder then
+      g_logger.info("UIMiniWindow: Enabling resize borders for " .. self:getId())
+      rightResizeBorder:show()
+      rightResizeBorder:enable()
+    end
+    
+    if leftResizeBorder then
+      leftResizeBorder:show()
+      leftResizeBorder:enable()
+    end
+    
+    if topResizeBorder then
+      topResizeBorder:show()
+      topResizeBorder:enable()
+    end
+    
+    -- Restore saved floating width
+    local savedWidth = self:getSettings('floatingWidth')
+    if savedWidth then
+      self:setWidth(savedWidth)
+      g_logger.info("UIMiniWindow: Restored floating width: " .. savedWidth)
+    end
+    
+    if not rightResizeBorder and not leftResizeBorder and not topResizeBorder then
+      g_logger.warning("UIMiniWindow: No resize borders found for " .. self:getId())
+    end
   end
 
   local oldPos = self:getPosition()
@@ -234,6 +266,36 @@ function UIMiniWindow:onDragLeave(droppedWidget, mousePos)
     self.setMovedChildMargin = nil
     self.movedOldMargin = nil
     self.movedIndex = nil
+  end
+
+  -- Check if being docked into a container
+  local newParent = self:getParent()
+  if newParent and newParent:getClassName() == 'UIMiniWindowContainer' then
+    -- Save current width before docking
+    local currentWidth = self:getWidth()
+    self:setSettings({floatingWidth = currentWidth})
+    
+    -- Disable all resize borders when docked
+    local rightResizeBorder = self:getChildById('rightResizeBorder')
+    local leftResizeBorder = self:getChildById('leftResizeBorder')
+    local topResizeBorder = self:getChildById('topResizeBorder')
+    
+    if rightResizeBorder then
+      rightResizeBorder:hide()
+      rightResizeBorder:disable()
+    end
+    
+    if leftResizeBorder then
+      leftResizeBorder:hide()
+      leftResizeBorder:disable()
+    end
+    
+    if topResizeBorder then
+      topResizeBorder:hide()
+      topResizeBorder:disable()
+    end
+    
+    -- Container will automatically resize via fitAll()
   end
 
   UIWindow:onDragLeave(self, droppedWidget, mousePos)
@@ -306,6 +368,15 @@ function UIMiniWindow:onHeightChange(height)
   end
   self:fitOnParent()
 end
+
+function UIMiniWindow:onWidthChange(width)
+  -- Only save width if floating (not in container)
+  local parent = self:getParent()
+  if parent and parent:getClassName() ~= 'UIMiniWindowContainer' then
+    self:setSettings({floatingWidth = width})
+  end
+end
+
 
 function UIMiniWindow:getSettings(name)
   if not self.save then return nil end
@@ -426,6 +497,12 @@ function UIMiniWindow:setHeight(height)
   UIWidget.setHeight(self, height)
   signalcall(self.onHeightChange, self, height)
 end
+
+function UIMiniWindow:setWidth(width)
+  UIWidget.setWidth(self, width)
+  signalcall(self.onWidthChange, self, width)
+end
+
 
 function UIMiniWindow:setContentHeight(height)
   local contentsPanel = self:getChildById('contentsPanel')

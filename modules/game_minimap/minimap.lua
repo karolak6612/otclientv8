@@ -299,3 +299,29 @@ end
 function zoomOut()
   minimapWidget:zoomOut()
 end
+
+function onLeftResizeBorderMove(self, mousePos, mouseMoved)
+  if self:isPressed() then
+    local parent = self:getParent()
+    local delta = mouseMoved.x
+    local newWidth = parent:getWidth() - delta
+    if newWidth >= 50 then
+      parent:setWidth(newWidth)
+      parent:setX(parent:getX() + delta)
+    end
+    return true
+  end
+end
+
+function onTopResizeBorderMove(self, mousePos, mouseMoved)
+  if self:isPressed() then
+    local parent = self:getParent()
+    local delta = mouseMoved.y
+    local newHeight = parent:getHeight() - delta
+    if newHeight >= 50 then
+      parent:setHeight(newHeight)
+      parent:setY(parent:getY() + delta)
+    end
+    return true
+  end
+end
