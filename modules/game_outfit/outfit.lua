@@ -1267,46 +1267,43 @@ function saveSettings()
 end
 
 function loadSettings()
-  if not g_resources.fileExists(settingsFile) then
-    g_resources.makeDir("/settings")
+  local filename = "outfit.json"
+  if _G.ExplorerConfig and _G.ExplorerConfig.OUTFIT_FILE then
+    filename = _G.ExplorerConfig.OUTFIT_FILE
   end
 
-  if g_resources.fileExists(settingsFile) then
-    local json_status, json_data =
-      pcall(
-      function()
-        return json.decode(g_resources.readFileContents(settingsFile))
-      end
-    )
-
-    if not json_status then
-      g_logger.error("[loadSettings] Couldn't load JSON: " .. json_data)
-      return
+  local f = io.open(filename, "r")
+  if f then
+    local content = f:read("*a")
+    f:close()
+    local status, result = pcall(function() return json.decode(content) end)
+    if status then
+      settings = result
+    else
+      g_logger.error("Failed to parse " .. filename .. ": " .. tostring(result))
     end
-
-    settings = json_data[g_game.getCharacterName()]
-    if not settings then
-      loadDefaultSettings()
-    end
-  else
-    loadDefaultSettings()
   end
+
+  -- Default values from ExplorerConfig
+  local Config = _G.ExplorerConfig or {}
+  
+  settings = settings or {} -- Ensure settings table exists
+  settings.presets = settings.presets or {}
+  settings.currentPreset = settings.currentPreset or 0
+  
+  -- Use Config defaults if available, otherwise fallback to true
+  if settings.showFloor == nil then settings.showFloor = Config.DEFAULT_SHOW_FLOOR ~= false end
+  if settings.showOutfit == nil then settings.showOutfit = Config.DEFAULT_SHOW_OUTFIT ~= false end
+  if settings.showMount == nil then settings.showMount = Config.DEFAULT_SHOW_MOUNT ~= false end
+  if settings.showWings == nil then settings.showWings = Config.DEFAULT_SHOW_WINGS ~= false end
+  if settings.showAura == nil then settings.showAura = Config.DEFAULT_SHOW_AURA ~= false end
+  if settings.showShader == nil then settings.showShader = Config.DEFAULT_SHOW_SHADER ~= false end
+  if settings.showBars == nil then settings.showBars = Config.DEFAULT_SHOW_BARS ~= false end
+  if settings.movement == nil then settings.movement = Config.DEFAULT_MOVEMENT_ENABLED ~= false end
 end
 
-function loadDefaultSettings()
-  settings = {
-    movement = false,
-    showFloor = false,
-    showOutfit = true,
-    showMount = false,
-    showWings = false,
-    showAura = false,
-    showShader = false,
-    showBars = false,
-    presets = {},
-    currentPreset = 0
-  }
-  settings.currentPreset = 0
+function saveSettings()
+  -- Read-only: Client does not write to outfit.json
 end
 
 function accept()

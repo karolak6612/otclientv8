@@ -5,6 +5,6 @@ Module
   website: https://github.com/edubart/otclient
   priority: 750
   scripts: [ config/explorer_config, events/event_definitions, events/event_bus, state/explorer_state, services/map_loader_service, services/player_service, services/lighting_service, services/persistence_service, services/outfit_service, services/spawn_service, utils/file_browser_utils, ui/widgets/file_browser_widget, ui/controllers/map_browser_controller, ui/controllers/tools_panel_controller, ui/controllers/spawn_simulator_controller, ui/init, init ]
-  dependencies: [ game_things, game_interface ]
+  dependencies: [ game_interface ]
   @onLoad: MapExplorer.init() MapExplorerUI.init()
   @onUnload: MapExplorer.terminate() MapExplorerUI.terminate()

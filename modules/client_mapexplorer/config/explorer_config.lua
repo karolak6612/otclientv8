@@ -42,8 +42,18 @@ _G.ExplorerConfig = {
   DEFAULT_OUTFIT_TYPE = 1,
   MAX_ADDONS = 3,                    -- 0, 1, 2, 3
   
+  -- Outfit Window Defaults (Read-Only)
+  DEFAULT_SHOW_FLOOR = true,
+  DEFAULT_SHOW_OUTFIT = true,
+  DEFAULT_SHOW_MOUNT = true,
+  DEFAULT_SHOW_WINGS = true,
+  DEFAULT_SHOW_AURA = true,
+  DEFAULT_SHOW_SHADER = true,
+  DEFAULT_SHOW_BARS = true,
+  DEFAULT_MOVEMENT_ENABLED = true,
+  
   -- Spawn Simulation
-  SIMULATION_TICK_MS = 1000,         -- Update interval in milliseconds
+  SIMULATION_TICK_MS = 700,         -- Update interval in milliseconds
   CREATURE_MOVE_CHANCE = 0.33,       -- Probability creature moves (33%)
   
   -- Persistence
@@ -52,7 +62,7 @@ _G.ExplorerConfig = {
   -- Paths
   DATA_DIR_TEMPLATE = "/data/things/%d",        -- %d = version number
   DEFAULT_MAP_BROWSER_PATH = "data/things/",
-  SPAWN_CONFIG_FILE = "/settings/spawn_config.json",
+  SPAWN_CONFIG_FILE = "spawn_config.json",
   
   -- UI Layout
   FILE_BROWSER_ITEM_HEIGHT = 20,
@@ -60,14 +70,12 @@ _G.ExplorerConfig = {
   PALETTE_CELL_SPACING = 1,
   PALETTE_COLOR_COUNT = 216,         -- 6x6x6 color cube
   
-  -- Settings Keys (g_settings)
+  -- Settings Keys (Deprecated - using local JSON files now)
+  STATE_FILE = "data/explorer_state.json",
+  OUTFIT_FILE = "outfit.json", -- User preferences (presets, view options)
+  SPAWN_CONFIG_FILE = "data/spawn_data.json", -- Spawn simulator configuration
+  
   SETTINGS_PREFIX = "mapexplorer/",
-  SETTINGS_KEYS = {
-    LAST_MAP_PATH = "mapexplorer/lastMapPath",
-    LAST_BROWSE_PATH = "mapexplorer/lastBrowsePath",
-    CLIENT_VERSION = "mapexplorer/clientVersion",
-    MAP_STATE_PREFIX = "map_state_",  -- + MD5(mapPath)
-  }
 }
 
 return _G.ExplorerConfig

@@ -1,7 +1,8 @@
 --- SpawnService
 -- Manages spawn simulation, XML parsing, and creature lifecycle.
 -- @module SpawnService
-SpawnService = {}
+_G.SpawnService = {}
+local SpawnService = _G.SpawnService
 
 -- Dependencies (Global)
 local Config = _G.ExplorerConfig
@@ -26,9 +27,12 @@ end
 
 -- Config Management
 function SpawnService.loadGlobalConfig()
-  if g_resources.fileExists(SPAWN_CONFIG_FILE) then
+  local f = io.open(SPAWN_CONFIG_FILE, "r")
+  if f then
+    local content = f:read("*a")
+    f:close()
     local status, result = pcall(function() 
-      return json.decode(g_resources.readFileContents(SPAWN_CONFIG_FILE)) 
+      return json.decode(content) 
     end)
     if status then
       -- Normalize keys to lowercase
@@ -38,10 +42,11 @@ function SpawnService.loadGlobalConfig()
       end
       ExplorerState.setSpawnConfig(config)
     else
-      g_logger.error("SpawnService: Failed to load config: " .. tostring(result))
+      g_logger.error("SpawnService: Failed to parse config: " .. tostring(result))
       ExplorerState.setSpawnConfig({})
     end
   else
+    -- File doesn't exist, use empty config
     ExplorerState.setSpawnConfig({})
   end
 end
@@ -49,7 +54,13 @@ end
 function SpawnService.saveGlobalConfig()
   local config = ExplorerState.getSpawnConfig()
   local status, err = pcall(function()
-    g_resources.writeFileContents(SPAWN_CONFIG_FILE, json.encode(config))
+    local f = io.open(SPAWN_CONFIG_FILE, "w")
+    if f then
+      f:write(json.encode(config, 2))
+      f:close()
+    else
+      error("Could not open file for writing")
+    end
   end)
   if not status then
     g_logger.error("SpawnService: Failed to save config: " .. tostring(err))
@@ -99,6 +110,19 @@ function SpawnService.loadSpawns(filename)
       local spawnBody = body:match('(.-)</spawn>')
       if spawnBody then
         for mName, mX, mY in spawnBody:gmatch('<monster name="([^"]+)" x="(%-?%d+)" y="(%-?%d+)"') do
+          local name = mName:lower()
+          uniqueMonsters[name] = true
+          
+          table.insert(spawnPoints, {
+            name = name,
+            pos = {x = cx + tonumber(mX), y = cy + tonumber(mY), z = cz},
+            radius = r,
+            creatureUid = nil
+          })
+        end
+
+        -- Find NPCs in body
+        for mName, mX, mY in spawnBody:gmatch('<npc name="([^"]+)" x="(%-?%d+)" y="(%-?%d+)"') do
           local name = mName:lower()
           uniqueMonsters[name] = true
           

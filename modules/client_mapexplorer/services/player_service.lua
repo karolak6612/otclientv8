@@ -1,7 +1,8 @@
 --- PlayerService
 -- Manages the local player entity, movement, teleportation, and modes.
 -- @module PlayerService
-PlayerService = {}
+_G.PlayerService = {}
+local PlayerService = _G.PlayerService
 
 -- Dependencies (Global)
 local Config = _G.ExplorerConfig

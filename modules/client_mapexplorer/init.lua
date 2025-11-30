@@ -90,6 +90,13 @@ function MapExplorer.init()
     mapPanel.onMouseRelease = function(widget, mousePos, mouseButton)
         if mouseButton == MouseLeftButton then
             if g_keyboard.isCtrlPressed() then
+                local tile = widget:getTile(mousePos)
+                if tile then
+                    local pos = tile:getPosition()
+                    PlayerService.teleportTo(pos)
+                    return true
+                end
+
                 local pos = widget:getPosition(mousePos)
                 if pos then
                     PlayerService.teleportTo(pos)
@@ -128,10 +135,11 @@ function MapExplorer.init()
   end
   
   -- Load last used settings
-  local lastPath = g_settings.getString(Config.SETTINGS_KEYS.LAST_MAP_PATH, '')
+  local globalSettings = PersistenceService.getGlobalSettings()
+  local lastPath = globalSettings.lastMapPath or ''
   ExplorerState.setMapPath(lastPath)
   
-  local lastVersion = g_settings.getNumber(Config.SETTINGS_KEYS.CLIENT_VERSION, 1098)
+  local lastVersion = globalSettings.clientVersion or 1098
   ExplorerState.setMapVersion(lastVersion)
 end
 
@@ -253,7 +261,14 @@ end
 
 -- OTUI Callbacks (Delegate to State/Services)
 MapExplorer.toggleNoClip = PlayerService.toggleNoClip
-MapExplorer.onLightChange = LightingService.setLightIntensity
+MapExplorer.onLightChange = function(value)
+  g_logger.info("MapExplorer.onLightChange called with: " .. tostring(value))
+  if LightingService then
+    LightingService.setLightIntensity(value)
+  else
+    g_logger.error("MapExplorer.onLightChange: LightingService is nil!")
+  end
+end
 MapExplorer.onColorChange = LightingService.setLightColor
 MapExplorer.onSpeedChange = PlayerService.setSpeed
 MapExplorer.onZoomSpeedChange = function(value) ExplorerState.setZoomSpeed(value) end

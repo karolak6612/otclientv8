@@ -1,0 +1,26 @@
+{
+  "4637558ea5ea53b2d06e98828342ba52": {
+    "pos": {
+      "y": 2008,
+      "x": 2007,
+      "z": 7
+    },
+    "speed": 1102,
+    "zoomSpeed": 2,
+    "outfit": {
+      "legs": 47,
+      "body": 44,
+      "auxType": 0,
+      "type": 129,
+      "feet": 104,
+      "head": 43,
+      "addons": 3
+    },
+    "light": 188,
+    "color": 215
+  },
+  "_global": {
+    "lastMapPath": "/data/things/800/rookgaard.otbm",
+    "clientVersion": 800
+  }
+}

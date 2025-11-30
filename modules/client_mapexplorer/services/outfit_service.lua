@@ -1,7 +1,8 @@
 --- OutfitService
 -- Handles outfit selection, validation, and application.
 -- @module OutfitService
-OutfitService = {}
+_G.OutfitService = {}
+local OutfitService = _G.OutfitService
 
 -- Dependencies (Global)
 local Config = _G.ExplorerConfig
@@ -80,30 +81,14 @@ function OutfitService.openWindowWithCallback(currentOutfit, callback)
   
   local status, err = pcall(function()
     if modules.game_outfit then
-      local window = modules.game_outfit.create(currentOutfit, outfits, mounts, wings, auras, shaders, healthBars, manaBars)
-      -- Hook the "Ok" button or whatever mechanism game_outfit uses
-      -- Note: game_outfit usually applies changes directly to local player.
-      -- If we want a callback, we might need to hook g_game.changeOutfit or similar.
-      -- For now, we'll assume game_outfit calls g_game.changeOutfit, which we hooked in PlayerService/Game.
-      
-      -- If we need to capture the result for a specific purpose (like SpawnSimulator),
-      -- we might need to temporarily override the global hook or pass a callback if game_outfit supports it.
-      -- Standard game_outfit doesn't support callback arg.
-      
-      -- Workaround: We can't easily get a callback from standard game_outfit without modifying it.
-      -- But for SpawnSimulator, we might just need to know the outfit was selected.
-      -- If this is for SpawnSimulator, we might need a custom outfit window or accept that it changes the player's outfit.
-      
-      if callback then
-         -- This is tricky with standard game_outfit. 
-         -- We might need to listen to the next outfit change event.
-         local connection = nil
-         connection = connect(g_game, { onOpenOutfitWindow = function() end }) -- Placeholder
-         -- Actually, we can hook the global changeOutfit again temporarily?
-         -- Or just let the user change their outfit, then "Copy from Player" in the simulator.
-      end
+      -- Pass callback as the last argument, supported by our modified outfit.lua
+      modules.game_outfit.create(currentOutfit, outfits, mounts, wings, auras, shaders, healthBars, manaBars, callback)
     end
   end)
+  
+  if not status then
+    g_logger.error("OutfitService: Failed to open window with callback: " .. tostring(err))
+  end
 end
 
 function OutfitService.applyOutfit(player, outfit)
@@ -151,7 +136,7 @@ function OutfitService.getValidOutfits()
   -- Limit to 2000 or until 10 consecutive failures
   for i = 1, Config.MAX_OUTFIT_SCAN do
     if OutfitService.isValidOutfit(i) then
-      table.insert(outfits, {i, "Outfit " .. i})
+      table.insert(outfits, {i, "Outfit " .. i, 3})
       consecutiveInvalid = 0
     else
       consecutiveInvalid = consecutiveInvalid + 1

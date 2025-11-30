@@ -111,6 +111,26 @@ function SpawnSimulatorController.onSpawnListChange(monsters, points)
     else
       label:setColor('red')
     end
+    
+    label.onDoubleClick = function()
+      local currentOutfit = SpawnService.getMonsterOutfit(name)
+      if not currentOutfit then
+        -- Default to player's outfit or a basic one if none set
+        local player = g_game.getLocalPlayer()
+        if player then
+           currentOutfit = player:getOutfit()
+        else
+           currentOutfit = {type=128, head=0, body=0, legs=0, feet=0, addons=0}
+        end
+      end
+      
+      -- Open outfit window with callback
+      _G.OutfitService.openWindowWithCallback(currentOutfit, function(newOutfit)
+         SpawnService.setMonsterOutfit(name, newOutfit)
+         -- Refresh list to show green status
+         SpawnSimulatorController.onSpawnListChange(monsters, points)
+      end)
+    end
   end
 end
 

@@ -7,6 +7,8 @@ PersistenceService = {}
 local Config = _G.ExplorerConfig
 local ExplorerState = _G.ExplorerState
 
+local STATE_FILE = Config.STATE_FILE or "explorer_state.json"
+
 function PersistenceService.init()
   g_logger.info("PersistenceService: init() called")
   -- Start auto-save loop
@@ -24,30 +26,72 @@ function PersistenceService.saveMapState()
   local player = g_game.getLocalPlayer()
   if not player then return end
   
-  local key = Config.SETTINGS_KEYS.MAP_STATE_PREFIX .. g_crypt.md5Encode(selectedMapPath)
-  local state = {
-    pos = player:getPosition(),
-    outfit = player:getOutfit(),
+  -- Load existing state first to preserve other maps
+  local allStates = PersistenceService.loadAllStates()
+  
+  local mapHash = g_crypt.md5Encode(selectedMapPath)
+  
+  allStates[mapHash] = {
+    pos = {x = player:getPosition().x, y = player:getPosition().y, z = player:getPosition().z},
+    outfit = player:getOutfit(), -- getOutfit returns table, safe to save
     speed = player:getSpeed(),
     light = ExplorerState.getLightIntensity(),
     color = ExplorerState.getLightColor(),
     zoomSpeed = ExplorerState.getZoomSpeed()
   }
-  g_settings.setNode(key, state)
-  g_settings.save()
+  
+  -- Save global settings
+  allStates._global = {
+    lastMapPath = selectedMapPath,
+    clientVersion = ExplorerState.getMapVersion()
+  }
+  
+  local status, err = pcall(function()
+    local f = io.open(STATE_FILE, "w")
+    if f then
+      f:write(json.encode(allStates, 2))
+      f:close()
+    else
+      g_logger.error("PersistenceService: Could not open state file for writing")
+    end
+  end)
+  
+  if not status then
+    g_logger.error("PersistenceService: Failed to save state: " .. tostring(err))
+  end
+end
+
+function PersistenceService.getGlobalSettings()
+  local allStates = PersistenceService.loadAllStates()
+  return allStates._global or {}
+end
+
+function PersistenceService.loadAllStates()
+  local f = io.open(STATE_FILE, "r")
+  if f then
+    local content = f:read("*a")
+    f:close()
+    local status, result = pcall(function() return json.decode(content) end)
+    if status then return result end
+  end
+  return {}
 end
 
 function PersistenceService.loadMapState()
   local selectedMapPath = ExplorerState.getMapPath()
   if not selectedMapPath or selectedMapPath == "" then return false end
-  local key = Config.SETTINGS_KEYS.MAP_STATE_PREFIX .. g_crypt.md5Encode(selectedMapPath)
-  local state = g_settings.getNode(key)
+  
+  local allStates = PersistenceService.loadAllStates()
+  local mapHash = g_crypt.md5Encode(selectedMapPath)
+  local state = allStates[mapHash]
   
   if state and state.pos then
     local player = g_game.getLocalPlayer()
     if player then
-      player:setPosition(state.pos)
-      ExplorerState.setPlayerPosition(state.pos)
+      -- Reconstruct position object
+      local pos = {x = state.pos.x, y = state.pos.y, z = state.pos.z}
+      player:setPosition(pos)
+      ExplorerState.setPlayerPosition(pos)
       
       if state.outfit then 
           player:setOutfit(state.outfit) 

@@ -1,0 +1,46 @@
+{
+  "4637558ea5ea53b2d06e98828342ba52": {
+    "outfit": {
+      "head": 43,
+      "auxType": 0,
+      "feet": 104,
+      "addons": 3,
+      "body": 44,
+      "legs": 47,
+      "type": 129
+    },
+    "pos": {
+      "x": 1998,
+      "z": 7,
+      "y": 1985
+    },
+    "speed": 1102,
+    "light": 188,
+    "zoomSpeed": 2,
+    "color": 215
+  },
+  "_global": {
+    "clientVersion": 800,
+    "lastMapPath": "/data/things/800/global.otbm"
+  },
+  "f3b32407ad4c6628a2b483092c790219": {
+    "outfit": {
+      "head": 105,
+      "auxType": 0,
+      "feet": 0,
+      "addons": 3,
+      "body": 0,
+      "legs": 0,
+      "type": 128
+    },
+    "pos": {
+      "x": 1995,
+      "z": 7,
+      "y": 1982
+    },
+    "speed": 200,
+    "light": 255,
+    "zoomSpeed": 2,
+    "color": 215
+  }
+}

@@ -77,7 +77,6 @@ end
 function ExplorerState.setMapVersion(version)
   assert(type(version) == "number" and version > 0, "Invalid version number")
   ExplorerState._map.version = version
-  g_settings.set(Config.SETTINGS_KEYS.CLIENT_VERSION, version)
 end
 
 function ExplorerState.isMapLoaded()
@@ -86,11 +85,15 @@ end
 
 function ExplorerState.setMapLoaded(loaded)
   ExplorerState._map.isLoaded = loaded
-  if loaded then
-    EventBus.emit(Events.MAP_LOADED, ExplorerState._map.path, ExplorerState._map.version)
-  else
-    EventBus.emit(Events.MAP_CLEARED)
-  end
+  EventBus.emit(Events.MAP_LOAD_STATE_CHANGE, loaded)
+end
+
+function ExplorerState.getMapSize()
+  return ExplorerState._map.size
+end
+
+function ExplorerState.setMapSize(width, height)
+  ExplorerState._map.size = {width = width, height = height}
 end
 
 -- ============================================
@@ -102,21 +105,8 @@ function ExplorerState.getPlayerPosition()
 end
 
 function ExplorerState.setPlayerPosition(pos)
-  if pos then
-      assert(type(pos) == "table" and pos.x and pos.y and pos.z, "Invalid position")
-  end
   ExplorerState._player.position = pos
   EventBus.emit(Events.PLAYER_POSITION_CHANGE, pos)
-end
-
-function ExplorerState.getPlayerSpeed()
-  return ExplorerState._player.speed
-end
-
-function ExplorerState.setPlayerSpeed(speed)
-  assert(speed >= Config.MIN_PLAYER_SPEED and speed <= Config.MAX_PLAYER_SPEED, "Speed out of range")
-  ExplorerState._player.speed = speed
-  EventBus.emit(Events.PLAYER_SPEED_CHANGE, speed)
 end
 
 function ExplorerState.getPlayerOutfit()
@@ -124,9 +114,17 @@ function ExplorerState.getPlayerOutfit()
 end
 
 function ExplorerState.setPlayerOutfit(outfit)
-  assert(type(outfit) == "table", "Outfit must be a table")
   ExplorerState._player.outfit = outfit
   EventBus.emit(Events.PLAYER_OUTFIT_CHANGE, outfit)
+end
+
+function ExplorerState.getPlayerSpeed()
+  return ExplorerState._player.speed
+end
+
+function ExplorerState.setPlayerSpeed(speed)
+  ExplorerState._player.speed = speed
+  EventBus.emit(Events.PLAYER_SPEED_CHANGE, speed)
 end
 
 function ExplorerState.isNoClipEnabled()
@@ -135,39 +133,42 @@ end
 
 function ExplorerState.setNoClipEnabled(enabled)
   ExplorerState._player.noClipEnabled = enabled
-  EventBus.emit(Events.NOCLIP_CHANGE, enabled)
+  EventBus.emit(Events.PLAYER_NOCLIP_CHANGE, enabled)
 end
 
 -- ============================================
 -- Camera/Light State
 -- ============================================
 
+function ExplorerState.getLight()
+  return ExplorerState._camera.light
+end
+
 function ExplorerState.getLightIntensity()
   return ExplorerState._camera.light.intensity
 end
 
-function ExplorerState.setLightIntensity(value)
-  assert(value >= Config.MIN_LIGHT_INTENSITY and value <= Config.MAX_LIGHT_INTENSITY, 
-    "Light intensity out of range: " .. tostring(value))
-  ExplorerState._camera.light.intensity = value
-  EventBus.emit(Events.LIGHT_CHANGE, ExplorerState._camera.light.intensity, ExplorerState._camera.light.color)
+function ExplorerState.setLightIntensity(intensity)
+  ExplorerState._camera.light.intensity = intensity
+  EventBus.emit(Events.LIGHT_CHANGE, intensity, ExplorerState._camera.light.color)
 end
 
 function ExplorerState.getLightColor()
   return ExplorerState._camera.light.color
 end
 
-function ExplorerState.setLightColor(value)
-  assert(value >= 0 and value <= 255, "Light color out of range")
-  ExplorerState._camera.light.color = value
-  EventBus.emit(Events.LIGHT_CHANGE, ExplorerState._camera.light.intensity, ExplorerState._camera.light.color)
+function ExplorerState.setLightColor(color)
+  ExplorerState._camera.light.color = color
+  EventBus.emit(Events.LIGHT_CHANGE, ExplorerState._camera.light.intensity, color)
 end
 
-function ExplorerState.getLight()
-  return {
-    intensity = ExplorerState._camera.light.intensity,
-    color = ExplorerState._camera.light.color
-  }
+function ExplorerState.getZoomLevel()
+  return ExplorerState._camera.zoom.level
+end
+
+function ExplorerState.setZoomLevel(level)
+  ExplorerState._camera.zoom.level = level
+  EventBus.emit(Events.ZOOM_CHANGE, level)
 end
 
 function ExplorerState.getZoomSpeed()
@@ -175,9 +176,7 @@ function ExplorerState.getZoomSpeed()
 end
 
 function ExplorerState.setZoomSpeed(speed)
-  assert(speed >= Config.MIN_ZOOM_SPEED and speed <= Config.MAX_ZOOM_SPEED, "Zoom speed out of range")
   ExplorerState._camera.zoom.speed = speed
-  EventBus.emit(Events.ZOOM_CHANGE, ExplorerState._camera.zoom.level, speed)
 end
 
 -- ============================================
@@ -243,7 +242,6 @@ end
 
 function ExplorerState.setBrowserPath(path)
   ExplorerState._ui.browserPath = path
-  g_settings.set(Config.SETTINGS_KEYS.LAST_BROWSE_PATH, path)
   EventBus.emit(Events.BROWSER_PATH_CHANGE, path)
 end
 

@@ -1,6 +1,6 @@
 EnterGameWindow
   id: enterGame
-  @onEnter: EnterGame.doLogin()
+  id: enterGame
 
   MenuLabel
     !text: tr('Account name')
@@ -14,6 +14,7 @@ EnterGameWindow
     anchors.right: parent.right
     anchors.top: prev.bottom
     margin-top: 2
+    enabled: false
 
   MenuLabel
     !text: tr('Password')
@@ -28,6 +29,7 @@ EnterGameWindow
     anchors.right: parent.right
     anchors.top: prev.bottom
     margin-top: 2
+    enabled: false
     
   MenuLabel
     !text: tr('Token')
@@ -42,6 +44,7 @@ EnterGameWindow
     anchors.right: parent.right
     anchors.top: prev.bottom
     margin-top: 2
+    enabled: false
 
   Panel
     id: serverSelectorPanel
@@ -85,6 +88,7 @@ EnterGameWindow
       menu-height: 125
       menu-scroll-step: 25
       text-offset: 5 2
+      enabled: false
       @onOptionChange: EnterGame.onServerChange()
     
   Panel
@@ -125,6 +129,7 @@ EnterGameWindow
       anchors.top: serverLabel.bottom
       margin-top: 2
       width: 150
+      enabled: false
 
     MenuLabel
       id: clientLabel
@@ -159,6 +164,7 @@ EnterGameWindow
     anchors.right: parent.right
     anchors.top: prev.bottom
     margin-top: 9
+    enabled: false
 
   HorizontalSeparator
     anchors.left: parent.left
@@ -174,6 +180,7 @@ EnterGameWindow
     margin-top: 10
     margin-left: 50
     margin-right: 50
+    enabled: false
     @onClick: EnterGame.doLogin()
 
   HorizontalSeparator

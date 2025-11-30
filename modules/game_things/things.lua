@@ -11,6 +11,10 @@ end
 
 function load()
   local version = g_game.getClientVersion()
+  if version == 0 then
+      return
+  end
+
   local things = g_settings.getNode('things')
   
   local datPath, sprPath

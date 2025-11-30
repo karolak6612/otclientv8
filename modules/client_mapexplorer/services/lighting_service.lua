@@ -1,7 +1,8 @@
 --- LightingService
 -- Controls ambient lighting intensity and color filters.
 -- @module LightingService
-LightingService = {}
+_G.LightingService = {}
+local LightingService = _G.LightingService
 
 -- Dependencies (Global)
 local Config = _G.ExplorerConfig
@@ -19,17 +20,22 @@ function LightingService.terminate()
 end
 
 function LightingService.setLightIntensity(value)
-  g_logger.info("LightingService: Light intensity changed to: " .. tostring(value))
+  g_logger.info("LightingService: setLightIntensity called with: " .. tostring(value))
   ExplorerState.setLightIntensity(value)
 end
 
 function LightingService.setLightColor(value)
-  g_logger.info("LightingService: Light color changed to: " .. tostring(value))
+  g_logger.info("LightingService: setLightColor called with: " .. tostring(value))
   ExplorerState.setLightColor(value)
 end
 
 function LightingService.onLightChangeEvent(intensity, color)
-  g_map.setLight({intensity=intensity, color=color})
+  g_logger.info("LightingService: onLightChangeEvent - Intensity: " .. tostring(intensity) .. ", Color: " .. tostring(color))
+  if g_map then
+      g_map.setLight({intensity=intensity, color=color})
+  else
+      g_logger.error("LightingService: g_map is nil!")
+  end
 end
 
 return LightingService

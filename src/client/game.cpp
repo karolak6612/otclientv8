@@ -620,7 +620,8 @@ void Game::forceLogout()
         return;
 
     g_lua.callGlobalField("g_game", "onLogout");
-    m_protocolGame->sendLogout();
+    if(m_protocolGame)
+        m_protocolGame->sendLogout();
     processDisconnect();
 }
 
@@ -630,7 +631,8 @@ void Game::safeLogout()
         return;
 
     g_lua.callGlobalField("g_game", "onLogout");
-    m_protocolGame->sendLogout();
+    if(m_protocolGame)
+        m_protocolGame->sendLogout();
 }
 
 void Game::autoWalk(const std::vector<Otc::Direction>& dirs, Position startPos)

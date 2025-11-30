@@ -46,7 +46,7 @@ end
 function MapBrowserController.onFileSelected(file)
   if file:ends(".otbm") then
     if loadButton then loadButton:setEnabled(true) end
-    ExplorerState.setMapPath(file)
+    ExplorerState.setBrowserPath(file)
     MapLoaderService.setSelectedMap(file) 
     g_logger.info("MapBrowserController: Selected " .. file)
   else
