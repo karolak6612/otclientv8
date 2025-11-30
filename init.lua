@@ -1,5 +1,5 @@
 -- CONFIG
-APP_NAME = "OTClientMapExplorer"
+APP_NAME = "otclientv8"
 APP_VERSION = 1341       -- client version for updater and login to identify outdated client
 DEFAULT_LAYOUT = "retro" -- on android it's forced to "mobile", check code bellow
 
