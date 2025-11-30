@@ -69,7 +69,9 @@ function MapLoaderService.loadSelectedMap()
     end
     
     -- NOW update the map path to the new one (after logout/save of old map)
-    ExplorerState.setMapPath(selectedMapPath)
+    -- Use relative path for portability (so hash is consistent across machines)
+    local relativePath = _G.FileBrowserUtils.getRelativePath(selectedMapPath)
+    ExplorerState.setMapPath(relativePath)
     
     local selectedVersion = ExplorerState.getMapVersion()
     local currentVersion = g_game.getClientVersion()

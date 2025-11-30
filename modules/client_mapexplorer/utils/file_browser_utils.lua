@@ -26,6 +26,31 @@ function _G.FileBrowserUtils.getParentPath(path)
   return newPath
 end
 
+function _G.FileBrowserUtils.getRelativePath(path)
+  local workDir = g_resources.getWorkDir()
+  -- Normalize slashes to match (Lua string patterns don't like backslashes much, use gsub)
+  local normalizedPath = path:gsub("\\", "/")
+  local normalizedWorkDir = workDir:gsub("\\", "/")
+  
+  -- Ensure workDir ends with slash for clean removal
+  if not normalizedWorkDir:ends("/") then
+    normalizedWorkDir = normalizedWorkDir .. "/"
+  end
+  
+  -- Remove workDir from path if it starts with it
+  -- We use plain string find to avoid pattern magic characters issues
+  local startIdx, endIdx = normalizedPath:find(normalizedWorkDir, 1, true)
+  
+  if startIdx == 1 then
+    local relative = normalizedPath:sub(endIdx + 1)
+    -- Ensure no leading slash (though logic above should handle it)
+    if relative:starts("/") then relative = relative:sub(2) end
+    return relative
+  end
+  
+  return path
+end
+
 function _G.FileBrowserUtils.sortFiles(files, currentPath)
   table.sort(files, function(a, b)
     local aIsDir = g_resources.directoryExists(currentPath .. a)

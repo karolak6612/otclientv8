@@ -1,5 +1,7 @@
 -- CONFIG
-APP_NAME = "otclientv8"
+APP_NAME = "otclient_mapexplorer"
+PRODUCT_NAME = "OTClientV8"
+WINDOW_TITLE = "OTClientV8 Map Explorer"
 APP_VERSION = 1341       -- client version for updater and login to identify outdated client
 DEFAULT_LAYOUT = "retro" -- on android it's forced to "mobile", check code bellow
 
@@ -29,7 +31,7 @@ Servers = {
 --USE_NEW_ENERGAME = true -- uses entergamev2 based on websockets instead of entergame
 ALLOW_CUSTOM_SERVERS = true -- if true it shows option ANOTHER on server list
 
-g_app.setName("OTCv8")
+g_app.setName(WINDOW_TITLE or APP_NAME)
 -- CONFIG END
 
 -- print first terminal message

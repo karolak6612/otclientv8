@@ -5,3 +5,7 @@
 /src/framework/_cmake
 /build-vs2022
 /vc17
+*.log
+*.exe
+*.dll
+/data/things

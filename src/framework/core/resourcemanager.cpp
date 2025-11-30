@@ -298,6 +298,68 @@ std::string ResourceManager::getCompactName() {
     return "otclientv8";
 }
 
+std::string ResourceManager::getProductName() {
+    std::string fileData;
+    if (loadDataFromSelf()) {
+        try {
+            fileData = readFileContents(INIT_FILENAME);
+        } catch (...) {
+            fileData = "";
+        }
+        unmountMemoryData();
+    }
+
+#ifndef ANDROID
+    std::vector<std::string> possiblePaths = { g_platform.getCurrentDir() };
+    const char* baseDir = PHYSFS_getBaseDir();
+    if (baseDir)
+        possiblePaths.push_back(baseDir);
+
+    if (fileData.empty()) {
+        try {
+            for (const std::string& dir : possiblePaths) {
+                if (!PHYSFS_mount(dir.c_str(), NULL, 0))
+                    continue;
+
+                if (PHYSFS_exists(INIT_FILENAME.c_str())) {
+                    fileData = readFileContents(INIT_FILENAME);
+                    PHYSFS_unmount(dir.c_str());
+                    break;
+                }
+                PHYSFS_unmount(dir.c_str());
+            }
+        } catch (...) {
+            fileData = "";
+        }
+    }
+
+    if (fileData.empty()) {
+        try {
+            for (const std::string& dir : possiblePaths) {
+                std::string path = dir + "/data.zip";
+                if (!PHYSFS_mount(path.c_str(), NULL, 0))
+                    continue;
+
+                if (PHYSFS_exists(INIT_FILENAME.c_str())) {
+                    fileData = readFileContents(INIT_FILENAME);
+                    PHYSFS_unmount(path.c_str());
+                    break;
+                }
+                PHYSFS_unmount(path.c_str());
+            }
+        } catch (...) {}
+    }
+#endif
+
+    std::smatch regex_match;
+    if (std::regex_search(fileData, regex_match, std::regex("PRODUCT_NAME[^\"]+\"([^\"]+)"))) {
+        if (regex_match.size() == 2 && regex_match[1].str().length() > 0 && regex_match[1].str().length() < 30) {
+            return regex_match[1].str();
+        }
+    }
+    return "OTClientV8";
+}
+
 bool ResourceManager::loadDataFromSelf(bool unmountIfMounted) {
     std::shared_ptr<std::vector<uint8_t>> data = nullptr;
 #ifdef ANDROID

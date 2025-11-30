@@ -39,6 +39,7 @@ public:
     bool setup();
 
     std::string getCompactName();
+    std::string getProductName();
     bool loadDataFromSelf(bool unmountIfMounted = false);
 
     bool fileExists(const std::string& fileName);
