@@ -4,7 +4,7 @@ Module
   author: edubart
   website: https://github.com/edubart/otclient
   priority: 750
-  scripts: [ filebrowser, mapexplorer_outfit, mapexplorer_game, mapexplorer_ui ]
+  scripts: [ filebrowser, mapexplorer_outfit, spawn_simulator, spawn_simulator_ui, mapexplorer_game, mapexplorer_ui ]
   dependencies: [ game_things, game_interface ]
   @onLoad: MapExplorerGame.init() MapExplorerUI.init()
   @onUnload: MapExplorerGame.terminate() MapExplorerUI.terminate()

@@ -174,7 +174,7 @@ local PreviewOptions = {
   ["showBars"] = onShowBarsChange
 }
 
-function create(currentOutfit, outfitList, mountList, wingList, auraList, shaderList, healthBarList, manaBarList)
+function create(currentOutfit, outfitList, mountList, wingList, auraList, shaderList, healthBarList, manaBarList, onAcceptCallback)
   g_logger.info("outfit.lua: create called")
   if ignoreNextOutfitWindow and g_clock.millis() < ignoreNextOutfitWindow + 1000 then
     return
@@ -198,7 +198,8 @@ function create(currentOutfit, outfitList, mountList, wingList, auraList, shader
     auras = auraList,
     shaders = shaderList,
     healthBars = healthBarList,
-    manaBars = manaBarList
+    manaBars = manaBarList,
+    onAcceptCallback = onAcceptCallback
   }
 
   window = g_ui.displayUI("outfitwindow")
@@ -1321,6 +1322,13 @@ function accept()
     if settings.currentPreset > 0 then
       settings.presets[settings.currentPreset].mounted = isMountedChecked
     end
+  end
+
+  if ServerData.onAcceptCallback then
+    g_logger.info("outfit.lua: Executing onAcceptCallback")
+    ServerData.onAcceptCallback(tempOutfit)
+    destroy()
+    return
   end
 
   if g_game.isOnline() then

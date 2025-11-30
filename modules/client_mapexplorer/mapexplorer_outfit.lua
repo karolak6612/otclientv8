@@ -37,8 +37,41 @@ function MapExplorerOutfit.openWindow()
   end)
   
   if not status then
-    g_logger.error("Failed to open outfit window: " .. tostring(err))
     displayErrorBox("Outfit Error", "Failed to open outfit window.")
+  end
+end
+
+function MapExplorerOutfit.openWindowWithCallback(currentOutfit, callback)
+  g_logger.info("MapExplorerOutfit: openWindowWithCallback called")
+  
+  -- Prepare lists for outfit window
+  local outfits = MapExplorerOutfit.getValidOutfits()
+  local mounts = {{0, "None"}}
+  local wings = {{0, "None"}}
+  local auras = {{0, "None"}}
+  local healthBars = {{0, "None"}}
+  local manaBars = {{0, "None"}}
+  
+  local shaders = {
+    {0, "Default", "outfit_default"},
+    {1, "None", "no_shader"}
+  }
+  
+  MapExplorerOutfit.ensureOutfitDefaults(currentOutfit)
+  
+  local maxAddons = MapExplorerOutfit.getMaxAddonsForOutfit(currentOutfit.type)
+  if currentOutfit.addons > maxAddons then
+    currentOutfit.addons = maxAddons
+  end
+  
+  local status, err = pcall(function()
+    if modules.game_outfit then
+      modules.game_outfit.create(currentOutfit, outfits, mounts, wings, auras, shaders, healthBars, manaBars, callback)
+    end
+  end)
+  
+  if not status then
+    g_logger.error("Failed to open outfit window: " .. tostring(err))
   end
 end
 

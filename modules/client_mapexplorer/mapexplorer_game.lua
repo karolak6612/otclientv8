@@ -14,6 +14,8 @@ function MapExplorerGame.init()
   selectedMapPath = g_settings.getString('mapexplorer/lastMapPath', '')
   selectedVersion = g_settings.getNumber('mapexplorer/clientVersion', 1098)
   
+  SpawnSimulator.init()
+  
   -- Connect to game start
   connect(g_game, { onGameStart = MapExplorerGame.onGameStart,
                     onGameEnd = MapExplorerGame.onGameEnd })
@@ -535,19 +537,10 @@ end
 
 -- Expose to global MapExplorer for OTUI compatibility
 MapExplorer.onTeleport = MapExplorerGame.onTeleport
-MapExplorer.toggleNoClip = MapExplorerGame.toggleNoClip
-MapExplorer.onSpeedChange = MapExplorerGame.onSpeedChange
-MapExplorer.onLightChange = MapExplorerGame.onLightChange
-MapExplorer.onColorChange = MapExplorerGame.onColorChange
-MapExplorer.onColorChange = MapExplorerGame.onColorChange
-MapExplorer.onZoomSpeedChange = MapExplorerGame.onZoomSpeedChange
-MapExplorer.resetView = MapExplorerGame.resetView
-MapExplorer.onPaletteClick = function(widget, mousePos) end -- Not used with individual widgets
+MapExplorer.toggleSpawnSimulator = function() SpawnSimulatorUI.toggle() end
 
-
-
-function MapExplorerGame.onZoomSpeedChange(value)
-  currentZoomSpeed = value
+function MapExplorerGame.getSelectedVersion()
+  return selectedVersion
 end
 
 function MapExplorerGame.saveMapState()

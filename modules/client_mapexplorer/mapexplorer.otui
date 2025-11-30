@@ -272,8 +272,17 @@ ExplorerPanel < MainWindow
     anchors.top: prev.bottom
     anchors.left: parent.left
     anchors.right: parent.right
-    margin-top: 10
+    margin-top: 5
     focusable: false
     @onClick: MapExplorer.resetView()
+
+  Button
+    id: spawnSimButton
+    !text: tr('Spawn Simulator')
+    anchors.top: prev.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 5
+    @onClick: MapExplorer.toggleSpawnSimulator()
 
 MapExplorerWindow
